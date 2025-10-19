@@ -1,0 +1,13 @@
+.page {
+/* Full‑bleed but with safe padding */
+padding-inline: max(16px, env(safe-area-inset-left));
+padding-block: 16px;
+}
+
+.pageInner {
+/* If you want *nearly* full width, set a high cap; otherwise remove max-width */
+max-width: 1280px;
+margin-inline: auto;
+display: grid;
+gap: var(--space-4);
+}

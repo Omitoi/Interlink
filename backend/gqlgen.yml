@@ -1,0 +1,42 @@
+# gqlgen configuration file
+
+# Where to write the generated server
+exec:
+  filename: graph/generated.go
+  package: graph
+
+# Where to write the resolver implementations
+resolver:
+  filename: graph/resolver.go
+  package: graph
+  type: Resolver
+
+# Where to write the generated models
+model:
+  filename: graph/model/models_gen.go
+  package: model
+
+# Where to write the generated schema
+schema:
+  - schema.graphql
+
+# Enable field resolvers for nested relationships
+models:
+  User:
+    fields:
+      profile:
+        resolver: true
+      bio:
+        resolver: true
+  Profile:
+    fields:
+      user:
+        resolver: true
+  Bio:
+    fields:
+      user:
+        resolver: true
+  
+  # Map custom scalar types
+  JSON:
+    model: encoding/json.RawMessage

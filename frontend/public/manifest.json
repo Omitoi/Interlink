@@ -1,0 +1,20 @@
+{
+  "name": "Interlink - Your analog dreams, digitally connected",
+  "short_name": "Interlink",
+  "description": "A platform connecting people with unique hobbies that blend traditional and modern interests.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#F8F8F8",
+  "theme_color": "#3498DB",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/favicon.ico",
+      "sizes": "any",
+      "type": "image/x-icon",
+      "purpose": "any"
+    }
+  ],
+  "categories": ["social", "lifestyle"],
+  "lang": "en-US"
+}

@@ -1,0 +1,35 @@
+/* Minimal modern reset (safe defaults) */
+*,
+*::before,
+*::after { box-sizing: border-box; }
+
+/* Remove default margins */
+* { margin: 0; }
+
+/* Make the app fill the viewport if desired */
+html, body, #root { height: 100%; }
+
+/* Improve text rendering */
+html { -webkit-text-size-adjust: 100%; }
+body {
+  line-height: var(--leading, 1.5);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Media defaults */
+img, picture, video, canvas, svg { display: block; max-width: 100%; }
+img { height: auto; }
+
+/* Form controls inherit typography */
+input, button, textarea, select { font: inherit; color: inherit; }
+
+/* Remove animations/transitions for users who prefer reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

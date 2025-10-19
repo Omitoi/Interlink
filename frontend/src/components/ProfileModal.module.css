@@ -1,0 +1,444 @@
+/* ProfileModal - Modern full-width image display with overlays */
+
+/* Overlay */
+.overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(4px);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-4);
+}
+
+/* Modal container */
+.modal {
+  position: relative;
+  background: var(--color-surface);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-xl);
+  border: 1px solid var(--color-border);
+  width: 100%;
+  max-width: 480px;
+  max-height: 95vh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Mobile full-screen */
+@media (max-width: 640px) {
+  .overlay {
+    padding: 0;
+    align-items: stretch;
+    justify-content: stretch;
+  }
+  
+  .modal {
+    width: 100%;
+    height: 100%;
+    max-width: none;
+    max-height: none;
+    border-radius: 0;
+    border: none;
+  }
+}
+
+/* Close button - fixed over entire modal */
+.closeButton {
+  position: fixed;
+  top: var(--space-4);
+  right: var(--space-4);
+  width: 44px;
+  height: 44px;
+  border: none;
+  background: transparent;
+  border-radius: var(--radius-full);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 1001;
+  color: black;
+  transition: all 0.2s ease;
+}
+
+.closeButton:hover {
+  background: rgba(0, 0, 0, 0.1);
+  transform: scale(1.05);
+}
+
+.closeButton:active {
+  transform: scale(0.95);
+}
+
+/* Content */
+.content {
+  padding: 0;
+  overflow-y: visible;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+@media (max-width: 640px) {
+  .content {
+    padding: 0;
+    padding-top: 0;
+    overflow-y: visible;
+  }
+}
+
+/* Header */
+.header {
+  margin-bottom: 0;
+  overflow: visible;
+  flex-shrink: 0;
+}
+
+.profilePictureContainer {
+  position: relative;
+  width: 100%;
+  min-height: auto;
+  height: auto;
+  max-height: none;
+  overflow: visible;
+  border-radius: 0;
+  border: none;
+  background: var(--color-bg);
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  line-height: 0;
+}
+
+.profilePictureContainer img {
+  width: 100%;
+  height: auto; 
+  max-height: none; 
+  object-fit: contain; 
+  border: none;
+  border-radius: 0;
+  display: block;
+}
+
+/* Status overlay - top left with no background */
+.statusOverlay {
+  position: absolute;
+  top: var(--space-3);
+  left: var(--space-3);
+  background: none;
+  backdrop-filter: none;
+  border-radius: 0;
+  padding: 0;
+  display: inline-flex;
+  flex-direction: row;
+  align-items: baseline;
+  gap: var(--space-1);
+  color: white;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.8);
+  width: auto;
+  max-width: none;
+}
+
+/* Name overlay */
+.nameOverlay {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: linear-gradient(transparent, rgba(0, 0, 0, 0.7));
+  padding: var(--space-6) var(--space-2);
+}
+
+.nameRow {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.name {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: white;
+  margin: 0;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+  flex: 1;
+}
+
+.distance {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.9);
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-md);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+/* Online/offline dots - updated for overlay */
+.dotOnline {
+  width: 10px;
+  height: 10px;
+  border-radius: var(--radius-full);
+  background-color: var(--color-online);
+  flex-shrink: 0;
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.3);
+}
+
+.dotOffline {
+  width: 10px;
+  height: 10px;
+  border-radius: var(--radius-full);
+  background-color: var(--color-offline);
+  flex-shrink: 0;
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.3);
+}
+
+/* About section */
+.aboutSection {
+  margin-bottom: var(--space-6);
+  padding: 0 var(--space-6); 
+}
+
+.aboutSection h2 {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: var(--color-text);
+  margin: var(--space-4) 0 var(--space-3) 0; 
+}
+
+.about {
+  color: var(--color-text-secondary);
+  line-height: 1.6;
+  margin: 0;
+}
+
+/* Bio section */
+.bio {
+  margin-bottom: var(--space-6);
+  padding: 0 var(--space-6);
+}
+
+.bio h2 {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: var(--color-text);
+  margin: 0 0 var(--space-4) 0;
+}
+
+.bioContent {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.bioSection {
+  background: var(--color-bg);
+  border-radius: var(--radius-md);
+  padding: var(--space-4);
+  border: 1px solid var(--color-border);
+}
+
+.bioSection h4 {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--color-text);
+  margin: 0 0 var(--space-2) 0;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.bioSection ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.bioSection li {
+  background: var(--color-primary);
+  color: white;
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-full);
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.bioSection div {
+  color: var(--color-text-secondary);
+  line-height: 1.5;
+}
+
+/* Actions */
+.actions {
+  border-top: 1px solid var(--color-border);
+  padding: var(--space-4) var(--space-6); 
+  margin: 0 0 calc(-1 * var(--space-6));
+  display: flex;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+@media (max-width: 640px) {
+  .actions {
+    padding: var(--space-4);
+    margin: 0 0 calc(-1 * var(--space-6));
+  }
+}
+
+.actions .u-btn {
+  flex: 1;
+  min-width: 0;
+}
+
+@media (max-width: 480px) {
+  .actions {
+    flex-direction: column;
+  }
+  
+  .actions .u-btn {
+    flex: none;
+  }
+}
+
+/* Loading and error states */
+.loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-8);
+  color: var(--color-text-secondary);
+  font-style: italic;
+}
+
+.error {
+  background: var(--color-error-bg);
+  color: var(--color-error-text);
+  border: 1px solid var(--color-error-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-4);
+  margin-bottom: var(--space-4);
+  font-size: 0.875rem;
+}
+
+/* Animations */
+.overlay {
+  animation: fadeIn 0.2s ease-out;
+}
+
+.modal {
+  animation: slideUp 0.3s ease-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (max-width: 640px) {
+  @keyframes slideUp {
+    from {
+      opacity: 0;
+      transform: translateY(40px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+}
+
+/* Mobile full screen layout */
+@media (max-width: 768px) {
+  .modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: 100%;
+    height: 100%;
+    max-width: none;
+    max-height: none;
+    border-radius: 0;
+    margin: 0;
+    transform: none;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .modalContent {
+    flex: 1;
+    overflow-y: auto;
+    padding: var(--space-4);
+  }
+
+  .closeButton {
+    position: absolute;
+    top: var(--space-3);
+    right: var(--space-3);
+    z-index: 10;
+    background: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(8px);
+    width: 60px;
+    height: 60px;
+    margin: 0;
+    padding: 0;
+    border: none;
+    border-radius: var(--radius-full);
+    color: white;
+  }
+
+  .profilePictureContainer {
+    height: auto;
+    border-radius: 0;
+    margin: -var(--space-4) -var(--space-4) var(--space-6);
+  }
+
+  .statusOverlay {
+    top: var(--space-3);
+    left: var(--space-3);
+    display: flex;
+    align-items: left;
+    gap: var(--space-1);
+  }
+
+  .nameOverlay {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    padding: var(--space-4) var(--space-3) var(--space-3);
+  }
+
+  .name {
+    font-size: 1.125rem;
+  }
+}

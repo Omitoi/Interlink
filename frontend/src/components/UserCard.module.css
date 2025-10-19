@@ -1,0 +1,128 @@
+/* src/components/UserCard.module.css */
+
+/* src/components/UserCard.module.css */
+
+.card {
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+  transition: all 0.2s ease;
+}
+
+.card:hover {
+  box-shadow: var(--shadow-md);
+  border-color: var(--color-primary);
+}
+
+.content {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  cursor: pointer;
+}
+
+.content:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: -2px;
+}
+
+.avatar {
+  display: flex;
+  align-items: center;
+}
+
+.info {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-width: 0;
+}
+
+.nameRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-1);
+}
+
+.name {
+  font-weight: 600;
+  color: var(--color-text);
+  font-size: 1rem;
+  margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 1;
+}
+
+.meta {
+  font-size: 0.875rem;
+  color: var(--color-text-secondary);
+}
+
+/* Online/offline dots */
+.dotOnline {
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-full);
+  background-color: var(--color-online);
+  display: inline-block;
+  flex-shrink: 0;
+}
+
+.dotOffline {
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-full);
+  background-color: var(--color-offline);
+  display: inline-block;
+  flex-shrink: 0;
+}
+
+/* Actions */
+.actions {
+  border-top: 1px solid var(--color-border);
+  padding: var(--space-3);
+  background: var(--color-bg);
+  display: flex;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.actions .u-btn {
+  flex: 1;
+  min-width: 0;
+}
+
+@media (max-width: 480px) {
+  .actions {
+    flex-direction: column;
+  }
+  
+  .actions .u-btn {
+    flex: none;
+  }
+}
+
+/* Score display */
+.score {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-1) var(--space-2);
+}
+
+.scoreText {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--color-primary);
+  background: var(--color-primary-bg);
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-full);
+  min-width: 3ch;
+  text-align: center;
+}

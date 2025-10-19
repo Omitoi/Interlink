@@ -1,0 +1,115 @@
+/* src/styles/foundation/base.css
+   Global base layer. Keep this TINY.
+   Order matters: tokens -> reset -> base.
+*/
+@import "./tokens.css";
+@import "./reset.css";
+
+/* Document defaults */
+:root { color-scheme: light dark; }
+
+html, body, #root { 
+  height: 100%; 
+  margin: 0;
+}
+
+body {
+  font-family: var(--font-sans);
+  line-height: var(--leading);
+  color: var(--color-text);
+  background: var(--color-bg);
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Headings: responsive scale, consistent weight */
+h1 { font-size: clamp(1.75rem, 1.2rem + 1.8vw, 2.5rem); font-weight: 700; }
+h2 { font-size: clamp(1.5rem,  1.1rem + 1.2vw, 2rem);   font-weight: 700; }
+h3 { font-size: 1.25rem;                                 font-weight: 600; }
+h4 { font-size: 1.125rem;                                font-weight: 600; }
+
+/* Text elements */
+p { margin-block: var(--space-2) var(--space-4); }
+small { font-size: 0.875em; color: var(--color-text-muted); }
+code, kbd, pre, samp { font-family: var(--font-mono); font-size: 0.95em; }
+
+/* Links: modern, accessible default */
+a {
+  color: var(--color-primary);
+  text-decoration: underline;
+  text-underline-offset: 0.08em;
+  text-decoration-thickness: 0.08em;
+}
+a:hover { text-decoration: underline; }
+
+/* Buttons (very light normalization) */
+button {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: inherit;
+  padding: calc(var(--space-3) - 0.15rem) var(--space-4); 
+  cursor: pointer;
+  transition: box-shadow 120ms ease, transform 120ms ease, border-color 120ms ease;
+}
+button:hover { box-shadow: var(--shadow-sm); }
+button:disabled { opacity: 0.6; cursor: not-allowed; }
+
+/* Forms */
+input, textarea, select {
+  width: 100%;
+  padding: var(--space-3) var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: inherit;
+}
+label { display: inline-block; margin-bottom: var(--space-2); }
+
+/* Focus styles (accessible, consistent across app) */
+:where(a, button, input, select, textarea, [role="button"], [tabindex]:not([tabindex="-1"])):focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 3px;
+}
+
+/* Tables (simple, clean baseline) */
+table { width: 100%; border-collapse: collapse; }
+th, td { text-align: left; padding: var(--space-2) var(--space-3); }
+thead th { border-bottom: 1px solid var(--color-border); }
+tbody tr + tr td { border-top: 1px solid var(--color-border); }
+
+/* Container helper (global, tiny) */
+.container {
+  max-width: var(--container-max);
+  margin-inline: auto;
+  padding-inline: var(--space-4);
+}
+
+/* Selection + scrollbar (subtle) */
+/* Text selection */
+::selection { 
+  /* Firefox fallback */
+  background: rgba(52, 152, 219, 0.3);
+  /* Modern browsers */
+  background: color-mix(in oklab, var(--color-primary) 30%, transparent); 
+}
+* { scrollbar-width: thin; scrollbar-color: var(--color-border) transparent; }
+::-webkit-scrollbar { height: 8px; width: 8px; }
+::-webkit-scrollbar-thumb { background: var(--color-border); border-radius: var(--radius-md); }
+::-webkit-scrollbar-track { background: transparent; }
+
+/* Respect reduced motion (just in case something slips through) */
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; animation: none !important; }
+}
+
+/* Bottom navigation spacing for mobile/tablet */
+@media (max-width: 1024px) {
+  body {
+    padding-bottom: 70px;
+  }
+}

@@ -1,0 +1,76 @@
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: match-me-db
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-matchme_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-matchme_password}
+      POSTGRES_DB: ${POSTGRES_DB:-matchme_db}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./db/schema.sql:/docker-entrypoint-initdb.d/001-schema.sql:ro
+    ports:
+      - "${POSTGRES_PORT:-5433}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-matchme_user} -d ${POSTGRES_DB:-matchme_db}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - match-me-network
+
+  # Go Backend Server
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: match-me-backend
+    environment:
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-matchme_user}:${POSTGRES_PASSWORD:-matchme_password}@postgres:5432/${POSTGRES_DB:-matchme_db}?sslmode=disable
+      - JWT_SECRET=${JWT_SECRET:-your_super_secure_jwt_secret_key_change_in_production}
+      - PORT=8080
+      - GO_ENV=production
+    ports:
+      - "${BACKEND_PORT:-8081}:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+    volumes:
+      - backend_uploads:/app/uploads
+    networks:
+      - match-me-network
+
+  # React Frontend
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:8081}
+    container_name: match-me-frontend
+    ports:
+      - "${FRONTEND_PORT:-3001}:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
+    networks:
+      - match-me-network
+
+volumes:
+  postgres_data:
+    driver: local
+  backend_uploads:
+    driver: local
+
+networks:
+  match-me-network:
+    driver: bridge

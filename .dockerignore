@@ -1,0 +1,19 @@
+# Docker ignore file for Match-Me
+.git
+.gitignore
+README.md
+Makefile
+.env
+.env.*
+docker-compose*.yml
+*/Dockerfile*
+*/node_modules
+*/dist
+*/build
+*/tmp
+*/.air.toml
+*/coverage.out
+*/server.log
+*/dev.log
+.DS_Store
+*.log

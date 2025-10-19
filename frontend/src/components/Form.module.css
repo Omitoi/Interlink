@@ -1,0 +1,22 @@
+/* src/components/Form.module.css */
+
+.input {
+  width: 100%;
+  padding: var(--space-3) var(--space-3); 
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: inherit;
+}
+
+.error {
+  color: var(--color-danger);
+  font-weight: 600;
+  margin-top: var(--space-3);
+}
+
+.success {
+  color: var(--color-success); /* Use the design system success color */
+  font-weight: 600;
+  margin-top: var(--space-3);
+}

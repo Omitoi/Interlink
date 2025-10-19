@@ -1,0 +1,189 @@
+/* src/pages/Recommendations.module.css */
+
+.page {
+  position: relative;
+  min-height: 100vh;
+  padding: var(--space-4);
+  padding-bottom: 140px;
+}
+
+/* Header */
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--space-6);
+  gap: var(--space-4);
+}
+
+.title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+/* Loading and error states */
+.loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-8);
+  color: var(--color-text-muted);
+  font-style: italic;
+}
+
+.error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-8);
+  text-align: center;
+}
+
+.errorText {
+  color: var(--color-error-text);
+  font-weight: 500;
+}
+
+/* Empty state */
+.empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-4);
+  padding: var(--space-8);
+  text-align: center;
+  color: var(--color-text-muted);
+}
+
+.emptyIcon {
+  opacity: 0.5;
+}
+
+.empty h3 {
+  margin: 0;
+  color: var(--color-text);
+}
+
+.empty p {
+  margin: 0;
+  max-width: 300px;
+}
+
+/* Recommendations grid */
+.recommendations {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: var(--space-4);
+  margin-bottom: var(--space-8);
+}
+
+/* Fixed action buttons */
+.fixedActions {
+  position: fixed;
+  bottom: calc(48px + var(--space-4));
+  left: var(--space-4);
+  right: var(--space-4);
+  display: flex;
+  gap: var(--space-3);
+  z-index: 100;
+  max-width: 400px;
+  margin: 0 auto;
+}
+
+.actionButton {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-4) var(--space-3);
+  border: none;
+  border-radius: var(--radius-lg);
+  font-weight: 600;
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: all 120ms ease;
+  box-shadow: var(--shadow-lg);
+}
+
+.actionButton:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-xl);
+}
+
+.actionButton:active {
+  transform: translateY(0);
+}
+
+.dismissButton {
+  background: var(--color-error-bg);
+  color: var(--color-error-text);
+  border: 1px solid var(--color-error-border);
+}
+
+.dismissButton:hover {
+  background: var(--color-danger);
+  color: white;
+}
+
+.requestButton {
+  background: var(--color-primary);
+  color: var(--color-primary-contrast);
+}
+
+.requestButton:hover {
+  background: color-mix(in oklab, var(--color-primary) 90%, black);
+}
+
+/* Mobile optimizations */
+@media (max-width: 768px) {
+  .page {
+    padding: var(--space-3);
+    padding-bottom: 160px;
+  }
+
+  .header {
+    flex-direction: column;
+    gap: var(--space-3);
+    align-items: stretch;
+  }
+
+  .title {
+    font-size: 1.25rem;
+    justify-content: center;
+  }
+
+  .recommendations {
+    grid-template-columns: 1fr;
+  }
+
+  .fixedActions {
+    left: var(--space-3);
+    right: var(--space-3);
+  }
+
+  .actionButton {
+    padding: var(--space-3) var(--space-2);
+    font-size: 0.8rem;
+  }
+}
+
+/* Desktop: no fixed actions, hide them */
+@media (min-width: 1024px) {
+  .page {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding-bottom: var(--space-8);
+  }
+  
+  .fixedActions {
+    display: none;
+  }
+}

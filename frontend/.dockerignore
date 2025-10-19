@@ -1,0 +1,12 @@
+# Docker ignore file for frontend
+.git
+.gitignore
+README.md
+Dockerfile*
+.env*
+node_modules
+dist
+build
+*.log
+dev.log
+coverage

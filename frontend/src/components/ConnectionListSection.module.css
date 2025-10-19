@@ -1,0 +1,62 @@
+/* src/pages/ConnectionListSection.module.css */
+
+.section {
+  margin-bottom: var(--space-5);
+  color: var(--color-text);
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-bottom: var(--space-3);
+}
+
+.title {
+  margin: 0;
+  font-family: var(--font-sans);
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.empty {
+  opacity: 0.75;
+  color: var(--color-text-muted); /* --muted -> --color-text-muted */
+}
+
+.list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: var(--space-4);
+}
+
+/* Mobile: single column layout */
+@media (max-width: 640px) {
+  .list {
+    grid-template-columns: 1fr;
+    gap: var(--space-3);
+  }
+}
+
+/* piste-spinneri */
+.dotSpinner {
+  display: inline-flex;
+  gap: var(--space-1);
+  color: var(--color-text-muted); /* --muted -> --color-text-muted */
+}
+.dotSpinner > i {
+  width: 6px;   
+  height: 6px; 
+  border-radius: var(--radius-full);
+  display: inline-block;
+  background: currentColor;
+  animation: ds 1s infinite ease-in-out;
+  opacity: 0.8;
+}
+.dotSpinner > i:nth-child(2) { animation-delay: .15s; }
+.dotSpinner > i:nth-child(3) { animation-delay: .3s; }
+
+@keyframes ds {
+  0%, 80%, 100% { transform: scale(0.6); opacity: 0.5; }
+  40% { transform: scale(1); opacity: 1; }
+}

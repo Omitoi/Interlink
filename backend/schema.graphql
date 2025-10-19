@@ -1,0 +1,178 @@
+# GraphQL schema for Match-Me application
+
+type User {
+  id: ID!
+  email: String!
+  createdAt: String!
+  updatedAt: String!
+  lastOnline: String
+  profile: Profile
+  bio: Bio
+}
+
+type Profile {
+  userID: ID!
+  displayName: String!
+  aboutMe: String
+  profilePictureFile: String
+  locationCity: String
+  locationLat: Float
+  locationLon: Float
+  maxRadiusKm: Int
+  isComplete: Boolean!
+  user: User!
+}
+
+type Bio {
+  userID: ID!
+  analogPassions: [String!]!
+  digitalDelights: [String!]!
+  collaborationInterests: String
+  favoriteFood: String
+  favoriteMusic: String
+  user: User!
+}
+
+type ChatMessage {
+  id: ID!
+  chatID: ID!
+  senderID: ID!
+  content: String!
+  createdAt: String!
+  isRead: Boolean!
+  sender: User!
+}
+
+type Chat {
+  id: ID!
+  user1ID: ID!
+  user2ID: ID!
+  lastMessageAt: String
+  unreadForUser1: Boolean!
+  unreadForUser2: Boolean!
+  user1: User!
+  user2: User!
+  messages: [ChatMessage!]!
+}
+
+type Connection {
+  id: ID!
+  userID: ID!
+  targetUserID: ID!
+  status: ConnectionStatus!
+  createdAt: String!
+  updatedAt: String!
+  user: User!
+  targetUser: User!
+}
+
+enum ConnectionStatus {
+  PENDING
+  ACCEPTED
+  DISMISSED
+  DISCONNECTED
+}
+
+type Query {
+  # User queries
+  me: User!
+  user(id: ID!): User
+  
+  # Profile queries
+  myProfile: Profile
+  userProfile(id: ID!): Profile
+  
+  # Bio queries
+  myBio: Bio
+  userBio(id: ID!): Bio
+  
+  # Recommendation queries
+  recommendations: [User!]!
+  
+  # Connection queries
+  connections: [Connection!]!
+  connectionRequests: [Connection!]!
+  
+  # Chat queries
+  chats: [Chat!]!
+  chat(id: ID!): Chat
+  chatMessages(chatID: ID!, limit: Int, offset: Int): [ChatMessage!]!
+}
+
+type Mutation {
+  # Authentication
+  register(email: String!, password: String!): AuthResult!
+  login(email: String!, password: String!): AuthResult!
+  logout: Boolean!
+  
+  # Profile management
+  updateProfile(input: ProfileInput!): Profile!
+  uploadAvatar(file: Upload!): Profile!
+  
+  # Bio management
+  updateBio(input: BioInput!): Bio!
+  
+  # Connection management
+  requestConnection(targetUserID: ID!): Connection!
+  respondToConnection(connectionID: ID!, accept: Boolean!): Connection!
+  disconnect(targetUserID: ID!): Boolean!
+  
+  # Chat management
+  sendMessage(targetUserID: ID!, content: String!): ChatMessage!
+  markMessagesAsRead(chatID: ID!): Boolean!
+  
+  # Recommendation management
+  dismissRecommendation(userID: ID!): Boolean!
+}
+
+type Subscription {
+  # Real-time messaging
+  messageReceived(chatID: ID!): ChatMessage!
+  
+  # Connection updates
+  connectionUpdate: Connection!
+  
+  # Presence updates
+  userPresence(userID: ID!): PresenceUpdate!
+  
+  # Typing indicators
+  typingStatus(chatID: ID!): TypingStatus!
+}
+
+# Input types
+input ProfileInput {
+  displayName: String
+  aboutMe: String
+  locationCity: String
+  locationLat: Float
+  locationLon: Float
+  maxRadiusKm: Int
+}
+
+input BioInput {
+  analogPassions: [String!]
+  digitalDelights: [String!]
+  collaborationInterests: String
+  favoriteFood: String
+  favoriteMusic: String
+}
+
+# Response types
+type AuthResult {
+  token: String!
+  user: User!
+}
+
+type PresenceUpdate {
+  userID: ID!
+  isOnline: Boolean!
+  lastOnline: String
+}
+
+type TypingStatus {
+  userID: ID!
+  isTyping: Boolean!
+}
+
+# File upload scalar
+scalar Upload

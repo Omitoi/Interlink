@@ -1,0 +1,525 @@
+/* src/pages/Profile.module.css */
+
+.page {
+  max-width: 720px;
+  margin-inline: auto;
+  display: grid;
+  gap: var(--space-6);
+  padding-block: var(--space-6);
+}
+
+/* Profile container - no gaps between header and content */
+.profileContainer {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  gap: 0;
+}
+
+/* Profile header similar to ProfileModal */
+.profileHeader {
+  position: relative;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0; /* Top corners rounded to match content section */
+  overflow: hidden; /* Clip to border radius */
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-bottom: none; /* Remove bottom border for seamless connection */
+}
+
+.profilePictureContainer {
+  position: relative;
+  width: 100%;
+  height: auto;
+  max-height: none; /* Remove max-height constraint */
+  overflow: visible; /* Match ProfileModal */
+  border-radius: 0; /* No border radius like ProfileModal */
+  background: var(--color-bg);
+  margin: 0;
+  padding: 0;
+  display: block; /* Changed from inline-block to block to eliminate gaps */
+  line-height: 0;
+}
+
+.profilePictureContainer > div {
+  width: 100% !important;
+  height: auto !important;
+  border-radius: 0 !important; /* No border radius like ProfileModal */
+  border: none !important;
+  display: block !important;
+}
+
+.profilePictureContainer img {
+  width: 100%;
+  height: auto;
+  object-fit: contain;
+  border: none !important;
+  border-radius: 0 !important; /* No border radius like ProfileModal */
+  display: block;
+}
+
+/* Status overlay - top left with no background */
+.statusOverlay {
+  position: absolute;
+  top: var(--space-3);
+  left: var(--space-3);
+  background: none; /* No background as requested */
+  backdrop-filter: none; /* No backdrop filter */
+  border-radius: 0;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  color: white;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.8); /* Better text visibility */
+}
+
+/* Name overlay - bottom with gradient background */
+.nameOverlay {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: linear-gradient(transparent, rgba(0, 0, 0, 0.7));
+  padding: var(--space-6) var(--space-2); /* Match ProfileModal exactly */
+  border-radius: 0; /* No border radius */
+}
+
+.profileName {
+  font-size: 1.25rem; /* Match ProfileModal font size */
+  font-weight: 700;
+  color: white;
+  margin: 0;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+}
+
+/* Edit controls - positioned below profile picture */
+.editControls {
+  padding: var(--space-4);
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  justify-content: center;
+  background: var(--color-surface);
+  border-top: 1px solid var(--color-border);
+}
+
+/* File preview styling - full width on new line */
+:global(.file-preview) {
+  flex-basis: 100%;
+  font-size: 0.875rem;
+  color: var(--color-text-muted);
+  padding: var(--space-2);
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  text-align: center;
+  margin-top: var(--space-2);
+}
+
+/* Error message styling - full width on new line */
+:global(.file-error) {
+  flex-basis: 100%;
+  color: var(--color-danger);
+  font-size: 0.875rem;
+  padding: var(--space-2);
+  /* Firefox fallback */
+  background: rgba(220, 53, 69, 0.12);
+  /* Modern browsers */
+  background: color-mix(in oklab, var(--color-danger) 12%, var(--color-surface));
+  border: 1px solid var(--color-danger);
+  border-radius: var(--radius-md);
+  text-align: center;
+  margin-top: var(--space-2);
+}
+
+/* Override the individual component layouts to work in the grid */
+:global(.picture-uploader-container) {
+  display: contents; /* This makes children participate in parent grid */
+}
+
+:global(.picture-remover-container) {
+  display: contents; /* This makes children participate in parent grid */
+}
+
+:global(.uploader-buttons),
+:global(.remover-buttons) {
+  display: flex;
+  gap: var(--space-2);
+}
+
+:global(.uploader-info),
+:global(.remover-info) {
+  grid-area: info;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  justify-self: center;
+}
+
+/* File preview styling */
+:global(.file-preview) {
+  font-size: 0.875rem;
+  color: var(--color-text-muted);
+  padding: var(--space-2);
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  text-align: center;
+  width: 100%;
+}
+
+/* Error message styling */
+:global(.file-error) {
+  color: var(--color-danger);
+  font-size: 0.875rem;
+  padding: var(--space-2);
+  /* Firefox fallback */
+  background: rgba(220, 53, 69, 0.12);
+  /* Modern browsers */
+  background: color-mix(in oklab, var(--color-danger) 12%, var(--color-surface));
+  border: 1px solid var(--color-danger);
+  border-radius: var(--radius-md);
+  text-align: center;
+  width: 100%;
+}
+
+.editButton {
+  background: rgba(0, 0, 0, 0.6);
+  color: white;
+  border: none;
+  border-radius: var(--radius-full);
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.editButton:hover {
+  background: rgba(0, 0, 0, 0.8);
+}
+
+.dotOnline {
+  width: 10px;
+  height: 10px;
+  margin-right: var(--space-2);
+  border-radius: var(--radius-full);
+  background-color: var(--color-online);
+  display: inline-block;
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.3);
+}
+
+.dotOffline {
+  width: 10px;
+  height: 10px;
+  margin-right: var(--space-2);
+  border-radius: var(--radius-full);
+  background-color: var(--color-offline);
+  display: inline-block;
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.3);
+}
+
+.notice {
+  margin: var(--space-4) 0;
+  padding: var(--space-4) var(--space-5);
+  border: 1px solid var(--color-primary);
+  /* Firefox fallback */
+  background: rgba(52, 152, 219, 0.12);
+  /* Modern browsers */
+  background: color-mix(in oklab, var(--color-primary) 12%, var(--color-surface));
+  border-radius: var(--radius-md);
+}
+
+.lead {
+  color: var(--color-text-muted);
+}
+
+/* Content section styling - seamlessly connected to profile picture */
+.contentSection {
+  background: var(--color-surface);
+  border-radius: 0 0 var(--radius-lg) var(--radius-lg); /* Bottom corners rounded to match header */
+  padding: var(--space-6);
+  border: 1px solid var(--color-border);
+  border-top: none; /* Remove top border for seamless connection */
+  margin: 0; /* Eliminate all margins */
+}
+
+/* Form layout */
+.form {
+  display: grid;
+  gap: var(--space-5);
+}
+
+/* Card (simplified - no collapsible functionality) */
+.card {
+  padding: 0;
+}
+
+.cardHeader {
+  margin-bottom: var(--space-4);
+}
+
+.cardTitle {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+/* File upload preview */
+.filePreview {
+  color: var(--color-text-muted);
+  font-style: italic;
+  margin-top: var(--space-1);
+}
+
+/* Header with edit button */
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-3);
+  margin-bottom: var(--space-3);
+}
+
+.header h2 {
+  margin: 0;
+  align-self: center;
+}
+
+.headerActions {
+  display: flex;
+  gap: var(--space-3);
+  align-items: center;
+}
+
+@media (max-width: 640px) {
+  .page {
+    padding-inline: var(--space-1); 
+  }
+
+  .headerActions {
+    flex-direction: row;
+    gap: var(--space-2);
+  }
+  
+  .header {
+    align-items: flex-start;
+  }
+
+  .buttonText {
+    display: none; 
+  }
+}
+
+/* Profile Picture */
+.profilePicture {
+  display: flex;
+  justify-content: center;
+  margin-bottom: var(--space-5);
+}
+
+.pictureLg { width: 120px; height: 120px; }
+.pictureMd { width: 80px;  height: 80px; }
+.pictureSm { width: 60px;  height: 60px; }
+
+.pictureImg {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: var(--radius-full);
+  border: 3px solid var(--color-border);
+}
+
+.picturePlaceholder {
+  width: 100%;
+  height: 100%;
+  border-radius: var(--radius-full);
+  border: 3px solid var(--color-border);
+  background: var(--color-bg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2.5rem;
+}
+
+.placeholderIcon {
+  opacity: 0.5;
+}
+
+/* Read-only view */
+.readOnlyView {
+  display: grid;
+  gap: var(--space-5);
+}
+
+.readOnlyValue {
+  padding: var(--space-2) 0;
+  color: var(--color-text);
+  line-height: var(--leading);
+}
+
+.placeholder {
+  color: var(--color-text-muted);
+  font-style: italic;
+}
+
+/* Weight display for read-only view */
+.weightDisplay {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) 0;
+}
+
+.weightValue {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex: 1;
+  max-width: 200px;
+}
+
+.weightBar {
+  flex: 1;
+  height: 8px;
+  background: var(--color-border);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.weightFill {
+  height: 100%;
+  background: var(--color-primary);
+  transition: width 0.3s ease;
+}
+
+.weightNumber {
+  font-size: 0.875rem;
+  color: var(--color-text-muted);
+  min-width: 3ch;
+}
+
+/* Grids */
+.grid        { display: grid; gap: var(--space-4); }
+.gridCols2   { grid-template-columns: 1fr 1fr; }
+.gridCols3   { grid-template-columns: 1fr 1fr 1fr; }
+.gridColsAuto { grid-template-columns: 1fr auto; align-items: end; }
+
+/* Field rows */
+.fieldRow   { display: grid; gap: var(--space-2); }
+.fieldLabel { font-size: 0.75rem; color: var(--color-text-muted); }
+
+/* Weight controls - matching ProfileWizard styling */
+.weightRow {
+  display: grid;
+  grid-template-columns: 1fr 1fr auto;
+  gap: var(--space-3);
+  align-items: center;
+  padding: var(--space-2) 0;
+}
+
+.weightLabel {
+  font-size: 0.875rem;
+  color: var(--color-text);
+}
+
+.weightSlider {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 6px;            
+  border-radius: 3px;
+  background: var(--color-border);
+  outline: none;    
+  transition: background 150ms ease;
+}
+
+.weightSlider:hover {
+  background: color-mix(in oklab, var(--color-border) 80%, var(--color-primary));
+}
+
+.weightSlider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  border-radius: var(--radius-full);
+  background: var(--color-primary);
+  cursor: pointer;
+  border: 2px solid var(--color-surface);
+  box-shadow: var(--shadow-sm);
+  transition: transform 150ms ease;
+}
+
+.weightSlider::-webkit-slider-thumb:hover {
+  transform: scale(1.1);
+}
+
+.weightSlider::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  border-radius: var(--radius-full);
+  background: var(--color-primary);
+  cursor: pointer;
+  border: 2px solid var(--color-surface);
+  box-shadow: var(--shadow-sm);
+  transition: transform 150ms ease;
+}
+
+.weightSlider::-moz-range-thumb:hover {
+  transform: scale(1.1);
+}
+
+.weightValue {
+  font-size: 0.875rem;
+  color: var(--color-text-muted);
+  min-width: 3ch;
+  text-align: center;
+  font-weight: 600;
+}
+
+/* Actions */
+.actions {
+  display: flex;
+  gap: var(--space-3);
+  margin-top: var(--space-3);
+}
+
+.btnSm {
+  padding: var(--space-1) var(--space-2);
+  line-height: 1;
+}
+
+.error {
+  color: var(--color-danger);
+  margin: var(--space-3) 0;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .gridCols2, .gridCols3 { grid-template-columns: 1fr; }
+  
+  .weightRow {
+    grid-template-columns: 1fr;
+    gap: var(--space-2);
+  }
+
+  .weightValue {
+    grid-column: 1;
+    text-align: left;
+    margin-top: var(--space-1);
+  }
+
+  .weightSlider {
+    margin-top: var(--space-1);
+  }
+}

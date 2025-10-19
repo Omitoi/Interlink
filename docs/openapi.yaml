@@ -1,0 +1,428 @@
+openapi: 3.1.0
+info:
+  title: Match-Me API
+  version: 0.1.0
+  description: >-
+    Draft OpenAPI specification for the Match-Me ("Interlink") platform.
+    Security: All endpoints (unless noted) require a Bearer JWT.
+servers:
+  - url: http://localhost:8080
+    description: Local Dev
+security:
+  - bearerAuth: []
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
+    UserSummary:
+      type: object
+      properties:
+        id: { type: integer }
+        display_name: { type: string }
+        profile_picture: { type: string, nullable: true }
+      required: [id, display_name]
+    ProfileSelf:
+      allOf:
+        - $ref: '#/components/schemas/UserSummary'
+        - type: object
+          properties:
+            about_me: { type: string }
+        /me/profile/complete:
+          post:
+            summary: Create or update profile & bio facets marking profile complete
+            requestBody:
+              required: true
+              content:
+                application/json:
+                  schema:
+                    type: object
+                    properties:
+                      display_name: { type: string }
+                      about_me: { type: string }
+                      location_city: { type: string }
+                      location_lat: { type: number, format: double }
+                      location_lon: { type: number, format: double }
+                      max_radius_km: { type: number }
+                      analog_passions: { type: array, items: { type: string } }
+                      digital_delights: { type: array, items: { type: string } }
+                      collaboration_interests: { type: array, items: { type: string } }
+                      favorite_food: { type: array, items: { type: string } }
+                      favorite_music: { type: array, items: { type: string } }
+                      other_bio: { type: array, items: { type: string } }
+                      match_preferences: { type: array, items: { type: string } }
+            responses:
+              '200':
+                description: OK
+                content:
+                  application/json:
+                    schema:
+                      type: object
+                      openapi: 3.1.0
+                      info:
+                        title: Match-Me API
+                        version: 0.1.1
+                        description: Core implemented endpoints + near-term planned additions.
+                      servers:
+                        - url: http://localhost:8080
+                      security:
+                        - bearerAuth: []
+                      components:
+                        securitySchemes:
+                          bearerAuth:
+                            type: http
+                            scheme: bearer
+                            bearerFormat: JWT
+                        schemas:
+                          Error:
+                            type: object
+                            required: [error]
+                            properties:
+                              error:
+                                type: string
+                          UserSummary:
+                            type: object
+                            properties:
+                              id: { type: integer }
+                              display_name: { type: string }
+                              profile_picture: { type: string, nullable: true }
+                            required: [id, display_name]
+                          ProfileSelf:
+                            allOf:
+                              - $ref: '#/components/schemas/UserSummary'
+                              - type: object
+                                properties:
+                                  about_me: { type: string, nullable: true }
+                                  location_city: { type: string, nullable: true }
+                                  is_complete: { type: boolean }
+                          BioView:
+                            type: object
+                            properties:
+                              id: { type: integer }
+                              analog_passions: { type: array, items: { type: string } }
+                              digital_delights: { type: array, items: { type: string } }
+                              seeking: { type: array, items: { type: string } }
+                              interests: { type: array, items: { type: string } }
+                            required: [id]
+                          RecommendationList:
+                            type: object
+                            properties:
+                              recommendations:
+                                type: array
+                                items: { type: integer }
+                            required: [recommendations]
+                          ConnectionsList:
+                            type: object
+                            properties:
+                              connections:
+                                type: array
+                                items: { type: integer }
+                            required: [connections]
+                      paths:
+                        /register:
+                          post:
+                            summary: Register a new user
+                            security: []
+                            requestBody:
+                              required: true
+                              content:
+                                application/json:
+                                  schema:
+                                    type: object
+                                    required: [email, password]
+                                    properties:
+                                      email: { type: string, format: email }
+                                      password: { type: string, minLength: 8 }
+                            responses:
+                              '201': { description: Created }
+                              '400': { description: Bad Request, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+                              '409': { description: Duplicate, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+                        /login:
+                          post:
+                            summary: Login
+                            security: []
+                            requestBody:
+                              required: true
+                              content:
+                                application/json:
+                                  schema:
+                                    type: object
+                                    required: [email, password]
+                                    properties:
+                                      email: { type: string, format: email }
+                                      password: { type: string }
+                            responses:
+                              '200': { description: OK }
+                              '401': { description: Unauthorized, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+                        /me:
+                          get:
+                            summary: Current user summary
+                            responses:
+                              '200':
+                                description: OK
+                                content:
+                                  application/json:
+                                    schema: { $ref: '#/components/schemas/UserSummary' }
+                              '401': { description: Unauthorized, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+                        /me/profile:
+                          get:
+                            summary: Full profile for current user
+                            responses:
+                              '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/ProfileSelf' } } } }
+                        /me/bio:
+                          get:
+                            summary: Bio facets for current user
+                            responses:
+                              '200': { description: OK }
+                        /me/profile/complete:
+                          post:
+                            summary: Create or update profile marking complete
+                            requestBody:
+                              required: true
+                              content:
+                                application/json:
+                                  schema:
+                                    type: object
+                                    properties:
+                                      display_name: { type: string }
+                                      about_me: { type: string }
+                                      location_city: { type: string }
+                            responses:
+                              '200': { description: OK }
+                        /recommendations:
+                          get:
+                            summary: Get up to 10 recommendation IDs (requires complete profile)
+                            responses:
+                              '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/RecommendationList' } } } }
+                              '403': { description: Incomplete profile, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+                        /users/{id}:
+                          get:
+                            summary: User summary (permission gated)
+                            parameters:
+                              - in: path
+                                name: id
+                                required: true
+                                schema: { type: integer }
+                            responses:
+                              '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/UserSummary' } } } }
+                              '404': { description: Not found or not permitted, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+                        /users/{id}/profile:
+                          get:
+                            summary: User profile (permission gated)
+                            parameters:
+                              - in: path
+                                name: id
+                                required: true
+                                schema: { type: integer }
+                            responses:
+                              '200': { description: OK }
+                              '404': { description: Not found or not permitted }
+                        /users/{id}/bio:
+                          get:
+                            summary: User bio facets (permission gated)
+                            parameters:
+                              - in: path
+                                name: id
+                                required: true
+                                schema: { type: integer }
+                            responses:
+                              '200': { description: OK }
+                              '404': { description: Not found or not permitted }
+                        /connections:
+                          get:
+                            summary: List connected user IDs
+                            responses:
+                              '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/ConnectionsList' } } } }
+                        /recommendations/{id}/dismiss:
+                          post:
+                            summary: (Planned) Dismiss a recommendation (not implemented)
+                            parameters:
+                              - in: path
+                                name: id
+                                required: true
+                                schema: { type: integer }
+                            responses:
+                              '501': { description: Not implemented }
+      tags: [Users]
+      summary: Update bio facets
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        '200': { description: Updated, content: { application/json: { schema: { $ref: '#/components/schemas/Bio' } } } }
+  /recommendations:
+    get:
+      tags: [Recommendations]
+      summary: Get up to 10 recommendation IDs
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/RecommendationList' } } } }
+        '403': { description: Incomplete profile, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+  /recommendations/{id}/dismiss:
+    post:
+      tags: [Recommendations]
+      summary: Dismiss a recommendation
+      parameters:
+        - in: path
+          name: id
+          schema: { type: integer }
+          required: true
+      responses:
+        '201':
+          description: Dismissed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  dismissed: { type: boolean }
+                required: [dismissed]
+        '404': { description: Not visible, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+  /connections:
+    get:
+      tags: [Connections]
+      summary: List connected user IDs
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/ConnectionsList' } } } }
+  /connections/requests:
+    get:
+      tags: [Connections]
+      summary: List incoming/outgoing connection requests
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/ConnectionRequests' } } } }
+    post:
+      tags: [Connections]
+      summary: Create a connection request
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [target_id]
+              properties:
+                target_id: { type: integer }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  request_id: { type: integer }
+                  target_id: { type: integer }
+                required: [request_id, target_id]
+        '409': { description: Already pending/connected, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+  /chats:
+    get:
+      tags: [Chat]
+      summary: List chat threads
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/ChatList' } } } }
+    post:
+      tags: [Chat]
+      summary: Create (or fetch existing) chat thread
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [other_user_id]
+              properties:
+                other_user_id: { type: integer }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  chat_id: { type: integer }
+                required: [chat_id]
+  /chats/{chat_id}/messages:
+    get:
+      tags: [Chat]
+      summary: List messages in chat
+      parameters:
+        - in: path
+          name: chat_id
+          schema: { type: integer }
+          required: true
+        - in: query
+          name: limit
+          schema: { type: integer, default: 50, maximum: 100 }
+        - in: query
+          name: before
+          schema: { type: integer, description: Message ID cursor }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/MessagePage' } } } }
+    post:
+      tags: [Chat]
+      summary: Send message
+      parameters:
+        - in: path
+          name: chat_id
+          schema: { type: integer }
+          required: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [content]
+              properties:
+                content: { type: string, minLength: 1, maxLength: 2000 }
+      responses:
+        '201': { description: Created, content: { application/json: { schema: { $ref: '#/components/schemas/Message' } } } }
+  /users/{id}:
+    get:
+      tags: [Users]
+      summary: Public summary for a user (permission gated)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/UserSummary' } } } }
+        '404': { description: Not found or not permitted, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+  /users/{id}/profile:
+    get:
+      tags: [Users]
+      summary: View another user's profile (permission gated, not public)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      responses:
+        '200': { description: OK (only if permitted), content: { application/json: { schema: { $ref: '#/components/schemas/ProfileView' } } } }
+        '404': { description: Not found OR not permitted (intentionally indistinguishable), content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+  /users/{id}/bio:
+    get:
+      tags: [Users]
+      summary: View another user's bio facets (permission gated, not public)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      responses:
+        '200': { description: OK (only if permitted), content: { application/json: { schema: { $ref: '#/components/schemas/BioView' } } } }
+        '404': { description: Not found OR not permitted (intentionally indistinguishable), content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }

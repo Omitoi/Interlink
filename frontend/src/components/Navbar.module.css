@@ -1,0 +1,146 @@
+/* src/components/Navbar.module.css */
+
+.navbar {
+  --navbar-h: 64px;
+  position: sticky;
+  top: 0;
+  z-index: 50;
+
+  display: flex;
+  align-items: center;
+  gap: var(--space-6);
+  height: var(--navbar-h);
+  padding-block: 0; 
+  padding-inline: var(--space-5);
+
+  background: var(--color-surface);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-weight: 800;
+  letter-spacing: 0.2px;
+  color: inherit;
+  text-decoration: none; 
+}
+
+.brandText {
+  font-size: 1.125rem;
+  color: var(--color-text);
+}
+
+.centerLogo {
+  display: none;
+}
+
+.nav {
+  display: flex;
+  align-items: center;
+  gap: var(--space-5);
+}
+
+.link {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1); 
+  color: var(--color-primary);
+  padding: var(--space-1) 0;
+  border-bottom: 2px solid transparent;
+  transition: border-color 120ms ease, text-decoration-color 120ms ease;
+}
+.link:hover { text-decoration: underline; }
+
+.active {
+  border-bottom-color: var(--color-primary);
+}
+
+.spacer {
+  margin-left: auto;
+}
+
+/* Mobile and Tablet - Bottom Navigation */
+@media (max-width: 1024px) {
+  .navbar {
+    position: fixed;
+    bottom: 0;
+    top: unset;
+    left: 0;
+    right: 0;
+    height: 48px; /* Even more compact */
+    padding: var(--space-1) var(--space-2); /* Minimal padding */
+    background: var(--color-surface);
+    border-top: 1px solid var(--color-border);
+    border-bottom: none;
+    box-shadow: var(--shadow-lg);
+    justify-content: center;
+    /* Handle safe areas for devices with home indicators */
+    padding-bottom: calc(var(--space-1) + env(safe-area-inset-bottom, 0));
+  }
+  
+  /* Hide desktop brand */
+  .brand {
+    display: none;
+  }
+  
+  /* Show center logo for mobile/tablet - make it prominent */
+  .centerLogo {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--color-primary);
+    text-decoration: none;
+    padding: var(--space-2) var(--space-3); /* Reduced padding for compact design */
+    background-color: rgba(var(--color-primary-rgb), 0.1);
+    border-radius: var(--radius-full);
+    transition: background-color 120ms ease;
+    transform: scale(1.1); /* Slightly smaller scale for compact navbar */
+  }
+  
+  .centerLogo:hover {
+    background-color: rgba(var(--color-primary-rgb), 0.15);
+  }
+  
+  .nav {
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+    width: 100%;
+    max-width: 500px;
+    gap: 0;
+  }
+  
+  .link {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0;
+    padding: var(--space-1) var(--space-2); /* Minimal padding for compact design */
+    border-bottom: none;
+    border-top: 2px solid transparent; /* Top border for active state */
+    border-radius: 0; /* Remove border radius for cleaner look */
+    transition: border-top-color 120ms ease, color 120ms ease;
+    flex: 1;
+    max-width: 60px;
+    min-height: 36px; /* Reduced height for compact design */
+  }
+  
+  .link:hover {
+    text-decoration: none;
+    color: var(--color-primary);
+  }
+  
+  .active {
+    border-top-color: var(--color-primary); /* Primary color top border for active state */
+    color: var(--color-primary);
+    background-color: transparent; /* Remove background highlight */
+  }
+  
+  /* Hide text on mobile */
+  .link span {
+    display: none;
+  }
+}

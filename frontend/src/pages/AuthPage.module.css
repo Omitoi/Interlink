@@ -1,0 +1,79 @@
+/* src/pages/AuthPage.module.css */
+
+.wrapper {
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  padding: var(--space-6);
+  background: var(--color-bg);
+}
+
+/* Card – layout only; visuals from .u-card (+ u-card--lg) */
+.card {
+  width: min(520px, 92vw);
+}
+
+.title {
+  font-size: clamp(1.5rem, 1.2rem + 0.8vw, 2rem);
+  font-weight: 700;
+  margin-bottom: var(--space-3);
+  text-align: center;
+}
+
+.logoContainer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+}
+
+.brandName {
+  font-size: clamp(1.5rem, 1.2rem + 0.8vw, 2rem);
+  font-weight: 700;
+  margin: 0;
+  color: var(--color-text);
+  text-align: center;
+}
+
+.subtitle {
+  color: var(--color-text-muted);
+  margin-bottom: var(--space-6);
+  text-align: center;
+}
+
+.redirect {
+  margin-top: var(--space-5);
+  text-align: center;
+}
+
+.form :where(label) {
+  display: inline-block;
+  margin-bottom: var(--space-2);
+  font-weight: 600;
+}
+
+.field {
+  margin-bottom: var(--space-5);
+}
+
+.input {
+  width: 100%;
+  padding: var(--space-3) var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: inherit;
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  margin-top: var(--space-6);
+}
+
+.error {
+  color: var(--color-danger);
+  font-weight: 600;
+}

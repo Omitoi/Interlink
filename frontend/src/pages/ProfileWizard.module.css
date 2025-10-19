@@ -1,0 +1,259 @@
+/* src/pages/ProfileWizard.module.css */
+
+.page {
+  max-width: 720px;
+  margin-inline: auto;
+  display: grid;
+  gap: var(--space-6);
+  padding-block: var(--space-6);
+}
+
+.header {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.title {
+  margin: 0;
+  font-size: 1.5rem;
+  font-weight: 600;
+}
+
+.progress {
+  color: var(--color-text-muted);
+  font-size: 0.875rem;
+}
+
+.error {
+  display: grid; gap: var(--space-4);
+}
+
+/* Step content */
+.stepCard {
+  display: grid; gap: var(--space-4);
+}
+
+.stepTitle {
+  margin: 0 0 var(--space-3) 0;
+  font-size: 1.125rem;
+  font-weight: 600;
+}
+
+.stepHint {
+  color: var(--color-text-muted);
+  margin: 0 0 var(--space-4) 0;
+  font-size: 0.875rem;
+}
+
+/* Form fields */
+.fieldGrid {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.fieldRow {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.fieldLabel {
+  font-size: 0.875rem;
+  color: var(--color-text-muted);
+  font-weight: 500;
+}
+
+.input {
+  width: 100%;
+  padding: var(--space-3) var(--space-3); 
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: inherit;
+  font-size: 1rem;
+  transition: border-color 150ms ease;
+}
+
+.input:focus {
+  border-color: var(--color-primary);
+}
+
+.textarea {
+  min-height: 100px;
+  resize: vertical;
+  font-family: inherit;
+}
+
+/* Weight controls */
+.weightRow {
+  display: grid;
+  grid-template-columns: 1fr 1fr auto;
+  gap: var(--space-3);
+  align-items: center;
+  padding: var(--space-2) 0;
+}
+
+.weightLabel {
+  font-size: 0.875rem;
+  color: var(--color-text);
+}
+
+.weightSlider {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 6px;            
+  border-radius: 3px;
+  background: var(--color-border);
+  outline: none;    
+  transition: background 150ms ease;
+}
+
+.weightSlider:hover {
+  background: color-mix(in oklab, var(--color-border) 80%, var(--color-primary));
+}
+
+.weightSlider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  border-radius: var(--radius-full);
+  background: var(--color-primary);
+  cursor: pointer;
+  border: 2px solid var(--color-surface);
+  box-shadow: var(--shadow-sm);
+  transition: transform 150ms ease;
+}
+
+.weightSlider::-webkit-slider-thumb:hover {
+  transform: scale(1.1);
+}
+
+.weightSlider::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  border-radius: var(--radius-full);
+  background: var(--color-primary);
+  cursor: pointer;
+  border: 2px solid var(--color-surface);
+  box-shadow: var(--shadow-sm);
+  transition: transform 150ms ease;
+}
+
+.weightSlider::-moz-range-thumb:hover {
+  transform: scale(1.1);
+}
+
+.weightInput {
+  width: 60px;
+  text-align: center;
+}
+
+.weightValue {
+  font-size: 0.875rem;
+  color: var(--color-text-muted);
+  min-width: 3ch;
+  text-align: center;
+  font-weight: 600;
+}
+
+/* Navigation */
+.navigation {
+  display: flex;
+  gap: var(--space-3);
+  margin-top: var(--space-5);
+  justify-content: flex-end;
+}
+
+.navButton {
+  min-width: 80px;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+  .page {
+    padding-inline: var(--space-4);
+  }
+
+  .weightRow {
+    grid-template-columns: 1fr;
+    gap: var(--space-2);
+  }
+
+  .weightValue {
+    grid-column: 1;
+    text-align: left;
+    margin-top: var(--space-1);
+  }
+
+  .weightSlider {
+    margin-top: var(--space-1);
+  }
+}
+
+/* Introduction and congratulations content */
+.introContent {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.introText {
+  margin: 0;
+  line-height: 1.6;
+}
+
+.introText strong {
+  color: var(--color-primary);
+  font-weight: 600;
+}
+
+/* Profile picture step styles */
+.pictureSection {
+  display: grid;
+  gap: var(--space-4);
+  align-items: center;
+}
+
+.avatarContainer {
+  text-align: center;
+}
+
+.avatarPreview {
+  border: 2px solid var(--color-border);
+  border-radius: var(--radius-lg);
+}
+
+.previewLabel {
+  margin: var(--space-2) 0 0 0;
+  font-size: 0.875rem;
+  color: var(--color-text-muted);
+  font-style: italic;
+}
+
+.uploadControls {
+  display: grid;
+  gap: var(--space-3);
+  justify-items: start;
+}
+
+.fileInput {
+  padding: var(--space-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+}
+
+.uploadButton {
+  animation: slideIn 0.2s ease-out;
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
