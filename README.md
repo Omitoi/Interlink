@@ -325,3 +325,5 @@ Each user sets **importance weights (0-10)** for each dimension:
 - **Distance Display:** Shows km/m in profile modals
 - **Score Percentages:** Compatibility badges on recommendation cards
 - **Real-time Updates:** WebSocket integration for live status
+
+**This is a transfer from the kood/sisu school gitea**
