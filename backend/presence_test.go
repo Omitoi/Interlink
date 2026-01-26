@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -24,7 +25,7 @@ func TestMePingHandler(t *testing.T) {
 		}
 
 		// Verify last_online was updated - check that user is now online
-		online, err := isOnlineNow(db, user.ID)
+		online, err := isOnlineNow(context.Background(), db, user.ID)
 		if err != nil {
 			t.Fatalf("Failed to check if user is online: %v", err)
 		}
@@ -80,7 +81,7 @@ func TestIsOnlineNow(t *testing.T) {
 			t.Fatalf("Failed to update last_online: %v", err)
 		}
 
-		online, err := isOnlineNow(db, user.ID)
+		online, err := isOnlineNow(context.Background(), db, user.ID)
 		if err != nil {
 			t.Fatalf("isOnlineNow failed: %v", err)
 		}
@@ -97,7 +98,7 @@ func TestIsOnlineNow(t *testing.T) {
 			t.Fatalf("Failed to update last_online: %v", err)
 		}
 
-		online, err := isOnlineNow(db, user.ID)
+		online, err := isOnlineNow(context.Background(), db, user.ID)
 		if err != nil {
 			t.Fatalf("isOnlineNow failed: %v", err)
 		}
@@ -108,7 +109,7 @@ func TestIsOnlineNow(t *testing.T) {
 	})
 
 	t.Run("Non-existent user", func(t *testing.T) {
-		online, err := isOnlineNow(db, 99999)
+		online, err := isOnlineNow(context.Background(), db, 99999)
 		if err != nil {
 			t.Fatalf("isOnlineNow should not error for non-existent user: %v", err)
 		}
@@ -126,7 +127,7 @@ func TestIsOnlineNow(t *testing.T) {
 			t.Fatalf("Failed to set last_online to NULL: %v", err)
 		}
 
-		online, err := isOnlineNow(db, userNull.ID)
+		online, err := isOnlineNow(context.Background(), db, userNull.ID)
 		if err != nil {
 			t.Fatalf("isOnlineNow failed for NULL last_online: %v", err)
 		}
@@ -151,8 +152,8 @@ func TestPresenceIntegration(t *testing.T) {
 	handler := mePingHandler(db)
 
 	// Both users start offline
-	online1, _ := isOnlineNow(db, user1.ID)
-	online2, _ := isOnlineNow(db, user2.ID)
+	online1, _ := isOnlineNow(context.Background(), db, user1.ID)
+	online2, _ := isOnlineNow(context.Background(), db, user2.ID)
 	if online1 || online2 {
 		t.Error("Expected both users to start offline")
 	}
@@ -164,8 +165,8 @@ func TestPresenceIntegration(t *testing.T) {
 	handler.ServeHTTP(w, req)
 
 	// Now user1 should be online, user2 still offline
-	online1, _ = isOnlineNow(db, user1.ID)
-	online2, _ = isOnlineNow(db, user2.ID)
+	online1, _ = isOnlineNow(context.Background(), db, user1.ID)
+	online2, _ = isOnlineNow(context.Background(), db, user2.ID)
 	if !online1 {
 		t.Error("Expected user1 to be online after ping")
 	}
@@ -180,8 +181,8 @@ func TestPresenceIntegration(t *testing.T) {
 	handler.ServeHTTP(w, req)
 
 	// Now both should be online
-	online1, _ = isOnlineNow(db, user1.ID)
-	online2, _ = isOnlineNow(db, user2.ID)
+	online1, _ = isOnlineNow(context.Background(), db, user1.ID)
+	online2, _ = isOnlineNow(context.Background(), db, user2.ID)
 	if !online1 || !online2 {
 		t.Error("Expected both users to be online after pings")
 	}

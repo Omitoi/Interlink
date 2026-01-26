@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"math"
@@ -309,8 +310,8 @@ func calculateMusicScore(userMusic, candidateMusic string) int {
 	return 0
 }
 
-func getRecommendedUserIDs(db *sql.DB, userID int) ([]int, error) {
-	results, err := getRecommendationsWithScores(db, userID)
+func getRecommendedUserIDs(ctx context.Context, db *sql.DB, userID int) ([]int, error) {
+	results, err := getRecommendationsWithScores(ctx, db, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -330,10 +331,10 @@ type RecommendationResult struct {
 	Distance        float64 `json:"distance,omitempty"`
 }
 
-func getRecommendationsWithScores(db *sql.DB, userID int) ([]RecommendationResult, error) {
+func getRecommendationsWithScores(ctx context.Context, db *sql.DB, userID int) ([]RecommendationResult, error) {
 	var userProfile Profile
 	var analogPassions, digitalDelights, matchPrefsRaw []byte
-	err := db.QueryRow(`
+	err := db.QueryRowContext(ctx, `
         SELECT user_id, analog_passions, digital_delights, collaboration_interests, favorite_food, favorite_music,
                location_lat, location_lon, max_radius_km, match_preferences
         FROM profiles WHERE user_id = $1
@@ -349,7 +350,7 @@ func getRecommendationsWithScores(db *sql.DB, userID int) ([]RecommendationResul
 	json.Unmarshal(digitalDelights, &userProfile.DigitalDelights)
 	json.Unmarshal(matchPrefsRaw, &userProfile.MatchPreferences)
 
-	rows, err := db.Query(`
+	rows, err := db.QueryContext(ctx, `
         SELECT p.user_id,
                p.analog_passions,
                p.digital_delights,

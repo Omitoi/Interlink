@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"fmt"
@@ -211,7 +212,7 @@ func clientReader(c *Client) {
 		switch msg.Type {
 		case "message":
 			// 1) Save to database
-			id, chatID, ts, err := saveChatMsg(c.db, c.userID, msg.To, msg.Body)
+			id, chatID, ts, err := saveChatMsg(context.Background(), c.db, c.userID, msg.To, msg.Body)
 			if err != nil {
 				c.send <- ServerEvent{Type: "error", Data: "cannot send message"}
 				continue
@@ -278,8 +279,8 @@ func clientWriter(c *Client) {
 }
 
 // Helper function for saving the message history to database
-func saveChatMsg(db *sql.DB, fromUserID int, toUserID int, content string) (int64, int, time.Time, error) {
-	tx, err := db.Begin()
+func saveChatMsg(ctx context.Context, db *sql.DB, fromUserID int, toUserID int, content string) (int64, int, time.Time, error) {
+	tx, err := db.BeginTx(ctx, nil)
 	if err != nil {
 		return 0, 0, time.Time{}, err
 	}
@@ -293,7 +294,7 @@ func saveChatMsg(db *sql.DB, fromUserID int, toUserID int, content string) (int6
 
 	// 1) Make sure that the connection status is 'accepted'
 	var ok int
-	err = tx.QueryRow(`
+	err = tx.QueryRowContext(ctx, `
 		SELECT 1
 		FROM connections
 		WHERE status = 'accepted'
@@ -309,7 +310,7 @@ func saveChatMsg(db *sql.DB, fromUserID int, toUserID int, content string) (int6
 
 	// 2) Fetch or create a chat id
 	var chatID int
-	err = tx.QueryRow(`
+	err = tx.QueryRowContext(ctx, `
 		SELECT id
 		FROM chats
 		WHERE user1_id = LEAST($1::int, $2::int) AND user2_id = GREATEST($1::int, $2::int)
@@ -317,7 +318,7 @@ func saveChatMsg(db *sql.DB, fromUserID int, toUserID int, content string) (int6
 	`, fromUserID, toUserID).Scan(&chatID)
 	if err == sql.ErrNoRows {
 		// Create
-		err = tx.QueryRow(`
+		err = tx.QueryRowContext(ctx, `
 			INSERT INTO chats (user1_id, user2_id)
 			VALUES (LEAST($1::int, $2::int), GREATEST($1::int, $2::int))
 			ON CONFLICT (user1_id, user2_id) DO NOTHING
@@ -325,7 +326,7 @@ func saveChatMsg(db *sql.DB, fromUserID int, toUserID int, content string) (int6
 		`, fromUserID, toUserID).Scan(&chatID)
 		if err == sql.ErrNoRows {
 			// Race: someone else created first -> refetch
-			err = tx.QueryRow(`
+			err = tx.QueryRowContext(ctx, `
 				SELECT id
 				FROM chats
 				WHERE user1_id = LEAST($1::int, $2::int) AND user2_id = GREATEST($1::int, $2::int)
@@ -340,7 +341,7 @@ func saveChatMsg(db *sql.DB, fromUserID int, toUserID int, content string) (int6
 	// 3) Add message
 	var msgID int64
 	var createdAt time.Time
-	err = tx.QueryRow(`
+	err = tx.QueryRowContext(ctx, `
 		INSERT INTO messages (chat_id, sender_id, content)
 		VALUES ($1, $2, $3)
 		RETURNING id, created_at
@@ -350,7 +351,7 @@ func saveChatMsg(db *sql.DB, fromUserID int, toUserID int, content string) (int6
 	}
 
 	// 4) Update last_message_at and unread to the peer
-	_, err = tx.Exec(`
+	_, err = tx.ExecContext(ctx, `
 		UPDATE chats c
 		SET last_message_at = $3,
 			unread_for_user1 = CASE WHEN $2 = c.user2_id THEN TRUE ELSE unread_for_user1 END,
@@ -364,10 +365,10 @@ func saveChatMsg(db *sql.DB, fromUserID int, toUserID int, content string) (int6
 	return msgID, chatID, createdAt, nil
 }
 
-func getChatMessages(db *sql.DB, userID int, otherUserID int, limit int, before *time.Time) ([]ChatMessage, error) {
+func getChatMessages(ctx context.Context, db *sql.DB, userID int, otherUserID int, limit int, before *time.Time) ([]ChatMessage, error) {
 	// 1) Resolve chat id
 	var chatID int
-	err := db.QueryRow(`
+	err := db.QueryRowContext(ctx, `
 		SELECT id
 		FROM chats
 		WHERE user1_id = LEAST($1::int, $2::int) AND user2_id = GREATEST($1::int, $2::int)
@@ -391,9 +392,9 @@ func getChatMessages(db *sql.DB, userID int, otherUserID int, limit int, before 
 
 	var rows *sql.Rows
 	if before != nil {
-		rows, err = db.Query(q, chatID, *before, limit)
+		rows, err = db.QueryContext(ctx, q, chatID, *before, limit)
 	} else {
-		rows, err = db.Query(q, chatID, nil, limit)
+		rows, err = db.QueryContext(ctx, q, chatID, nil, limit)
 	}
 	if err != nil {
 		return nil, err
@@ -427,13 +428,13 @@ func getChatMessages(db *sql.DB, userID int, otherUserID int, limit int, before 
 	}
 
 	// 3) Set all messages from the other user as read and clear unread flag for this user
-	_, _ = db.Exec(`
+	_, _ = db.ExecContext(ctx, `
 		UPDATE messages
 		SET is_read = TRUE
 		WHERE chat_id = $1 AND sender_id <> $2 AND is_read IS FALSE
 	`, chatID, userID)
 
-	_, _ = db.Exec(`
+	_, _ = db.ExecContext(ctx, `
 		UPDATE chats c
 		SET unread_for_user1 = CASE WHEN $2 = c.user1_id THEN FALSE ELSE unread_for_user1 END,
 			unread_for_user2 = CASE WHEN $2 = c.user2_id THEN FALSE ELSE unread_for_user2 END
@@ -478,7 +479,7 @@ func getChatHistoryHandler(db *sql.DB) http.HandlerFunc {
 			}
 		}
 
-		msgs, err := getChatMessages(db, userID, otherID, limit, beforePtr)
+		msgs, err := getChatMessages(r.Context(), db, userID, otherID, limit, beforePtr)
 		if err != nil {
 			http.Error(w, "failed to fetch messages", http.StatusInternalServerError)
 

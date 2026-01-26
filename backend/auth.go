@@ -4,12 +4,14 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"log"
 	"net/http"
 	"strings"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/lib/pq"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -55,12 +57,13 @@ func registerHandler(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		res, err := db.Exec(
+		res, err := db.ExecContext(r.Context(),
 			"INSERT INTO users (email, password_hash) VALUES ($1, $2)",
 			req.Email, string(hashedPassword),
 		)
 		if err != nil {
-			if strings.Contains(err.Error(), "duplicate key value violates unique constraint") {
+			var pqErr *pq.Error
+			if errors.As(err, &pqErr) && pqErr.Code == "23505" { // unique_violation
 				writeError(w, http.StatusConflict, "email_exists")
 				return
 			}
@@ -74,11 +77,11 @@ func registerHandler(db *sql.DB) http.HandlerFunc {
 		if id, err := res.LastInsertId(); err == nil {
 			newID = int(id)
 		} else {
-			_ = db.QueryRow("SELECT id FROM users WHERE email = $1", req.Email).Scan(&newID)
+			_ = db.QueryRowContext(r.Context(), "SELECT id FROM users WHERE email = $1", req.Email).Scan(&newID)
 		}
 
 		// Update last_online for the new user
-		_, err = db.Exec("UPDATE users SET last_online = NOW() WHERE id = $1", newID)
+		_, err = db.ExecContext(r.Context(), "UPDATE users SET last_online = NOW() WHERE id = $1", newID)
 		if err != nil {
 			log.Println("Failed to update last_online for new user:", err)
 		}
@@ -126,7 +129,7 @@ func loginHandler(db *sql.DB) http.HandlerFunc {
 
 		var userID int
 		var passwordHash string
-		err := db.QueryRow("SELECT id, password_hash FROM users WHERE email = $1", req.Email).Scan(&userID, &passwordHash)
+		err := db.QueryRowContext(r.Context(), "SELECT id, password_hash FROM users WHERE email = $1", req.Email).Scan(&userID, &passwordHash)
 		if err == sql.ErrNoRows {
 			writeError(w, http.StatusUnauthorized, "invalid_credentials")
 			return
@@ -143,7 +146,7 @@ func loginHandler(db *sql.DB) http.HandlerFunc {
 		}
 
 		// Update last_online
-		_, err = db.Exec("UPDATE users SET last_online = NOW() WHERE id = $1", userID)
+		_, err = db.ExecContext(r.Context(), "UPDATE users SET last_online = NOW() WHERE id = $1", userID)
 		if err != nil {
 			log.Println("Failed to update last_online:", err)
 			// Don't fail login, just log the error
@@ -191,7 +194,8 @@ func authenticate(next http.HandlerFunc) http.HandlerFunc {
 			return
 		}
 		// Update last_online
-		_, err = db.Exec("UPDATE users SET last_online = NOW() WHERE id = $1", int(userID))
+		// Update last_online
+		_, err = db.ExecContext(r.Context(), "UPDATE users SET last_online = NOW() WHERE id = $1", int(userID))
 		if err != nil {
 			log.Println("Failed to update last_online:", err)
 		}

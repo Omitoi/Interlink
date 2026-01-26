@@ -7,6 +7,8 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+
+	"golang.org/x/sync/errgroup"
 )
 
 // Dispatcher for /users/* to route summary/profile/bio
@@ -50,14 +52,14 @@ func userHandler(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		displayName, profilePicture, err := fetchBasicUserInfo(db, userID)
+		displayName, profilePicture, err := fetchBasicUserInfo(r.Context(), db, userID)
 		if err != nil {
 			writeError(w, http.StatusNotFound, "not_found")
 			return
 		}
 
 		// Check peer's online status
-		onlineDB, err := isOnlineNow(db, userID) // TTL 90s in SQL
+		onlineDB, err := isOnlineNow(r.Context(), db, userID) // TTL 90s in SQL
 		if err != nil {
 			// Not critical. If fails, assume that the user is offline
 			onlineDB = false
@@ -92,7 +94,7 @@ func userProfileHandler(db *sql.DB) http.HandlerFunc {
 		// Permission check: Only allow if recommended, pending/accepted connection, or connected
 		allowed := false
 		var count int
-		err = db.QueryRow(`
+		err = db.QueryRowContext(r.Context(), `
             SELECT COUNT(*) FROM connections
             WHERE ((user_id = $1 AND target_user_id = $2) OR (user_id = $2 AND target_user_id = $1))
             AND status IN ('accepted', 'pending')
@@ -101,7 +103,7 @@ func userProfileHandler(db *sql.DB) http.HandlerFunc {
 			allowed = true
 		}
 		if !allowed {
-			recs, err := getRecommendedUserIDs(db, requesterID)
+			recs, err := getRecommendedUserIDs(r.Context(), db, requesterID)
 			if err == nil {
 				for _, id := range recs {
 					if id == targetID {
@@ -116,30 +118,72 @@ func userProfileHandler(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		aboutMe, displayName, profilePicture, err := fetchProfileInfo(db, targetID)
-		if err != nil {
-			writeError(w, http.StatusNotFound, "not_found")
-			return
-		}
+		// Use errgroup for parallel fetching
+		g, ctx := errgroup.WithContext(r.Context())
 
-		// Fetch location data for distance calculation
-		var locationLat, locationLon sql.NullFloat64
-		err = db.QueryRow(`
+		var (
+			aboutMe, displayName, profilePicture string
+			locationLat, locationLon             sql.NullFloat64
+			onlineDB                             bool
+		)
+
+		// 1. Fetch Profile Info
+		g.Go(func() error {
+			// Fetch profile info but respect context cancellation
+			var err error
+			aboutMe, displayName, profilePicture, err = fetchProfileInfo(ctx, db, targetID)
+			if err != nil {
+				return err
+			}
+			// Manual check for context cancellation
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			default:
+				return nil
+			}
+		})
+
+		// 2. Fetch Location Data
+		g.Go(func() error {
+			err := db.QueryRowContext(ctx, `
 			SELECT location_lat, location_lon 
 			FROM profiles 
 			WHERE user_id = $1
 		`, targetID).Scan(&locationLat, &locationLon)
-		if err != nil {
-			// Location data is optional, continue without it
-			locationLat.Valid = false
-			locationLon.Valid = false
-		}
+			if err != nil {
+				// Swallow errors for optional location data
+				locationLat.Valid = false
+				locationLon.Valid = false
+				return nil
+			}
+			return nil
+		})
 
-		// Check peer's online status
-		onlineDB, err := isOnlineNow(db, targetID) // TTL 90s in SQL
-		if err != nil {
-			// Not critical. If fails, assume that the user is offline
-			onlineDB = false
+		// 3. Check Online Status
+		g.Go(func() error {
+			var err error
+			onlineDB, err = isOnlineNow(ctx, db, targetID)
+			if err != nil {
+				onlineDB = false
+			}
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			default:
+				return nil
+			}
+		})
+
+		// Wait for all
+		if err := g.Wait(); err != nil {
+			// If fetchProfileInfo failed, we return 404/500
+			if err == sql.ErrNoRows {
+				writeError(w, http.StatusNotFound, "not_found")
+			} else {
+				writeError(w, http.StatusInternalServerError, "db_error")
+			}
+			return
 		}
 
 		resp := map[string]interface{}{
@@ -177,12 +221,12 @@ func userBioHandler(db *sql.DB) http.HandlerFunc {
 		// Reuse permission strategy: connections or recommendations
 		allowed := false
 		var count int
-		_ = db.QueryRow(`SELECT COUNT(*) FROM connections WHERE ((user_id = $1 AND target_user_id = $2) OR (user_id = $2 AND target_user_id = $1)) AND status IN ('accepted','pending')`, requesterID, targetID).Scan(&count)
+		_ = db.QueryRowContext(r.Context(), `SELECT COUNT(*) FROM connections WHERE ((user_id = $1 AND target_user_id = $2) OR (user_id = $2 AND target_user_id = $1)) AND status IN ('accepted','pending')`, requesterID, targetID).Scan(&count)
 		if count > 0 {
 			allowed = true
 		}
 		if !allowed {
-			if recs, err := getRecommendedUserIDs(db, requesterID); err == nil {
+			if recs, err := getRecommendedUserIDs(r.Context(), db, requesterID); err == nil {
 				for _, id := range recs {
 					if id == targetID {
 						allowed = true
@@ -196,7 +240,7 @@ func userBioHandler(db *sql.DB) http.HandlerFunc {
 			return
 		}
 		var analog, digital, collaborationInterests, favoriteFood, favoriteMusic json.RawMessage
-		err = db.QueryRow(`SELECT analog_passions, digital_delights, to_jsonb(collaboration_interests), to_jsonb(favorite_food), to_jsonb(favorite_music) FROM profiles WHERE user_id = $1`, targetID).Scan(&analog, &digital, &collaborationInterests, &favoriteFood, &favoriteMusic)
+		err = db.QueryRowContext(r.Context(), `SELECT analog_passions, digital_delights, to_jsonb(collaboration_interests), to_jsonb(favorite_food), to_jsonb(favorite_music) FROM profiles WHERE user_id = $1`, targetID).Scan(&analog, &digital, &collaborationInterests, &favoriteFood, &favoriteMusic)
 		if err != nil {
 			writeError(w, http.StatusNotFound, "not_found")
 			return
@@ -241,7 +285,7 @@ func completeProfileHandler(db *sql.DB) http.HandlerFunc {
 		}
 		userID := r.Context().Value(userIDKey).(int)
 
-		_, err := db.Exec(`
+		_, err := db.ExecContext(r.Context(), `
             INSERT INTO profiles (
                 user_id, display_name, about_me, location_city, location_lat, location_lon, max_radius_km,
                 analog_passions, digital_delights, collaboration_interests, favorite_food, favorite_music, other_bio, match_preferences, is_complete
@@ -279,7 +323,7 @@ func completeProfileHandler(db *sql.DB) http.HandlerFunc {
 func meHandler(db *sql.DB) http.HandlerFunc {
 	return authenticate(func(w http.ResponseWriter, r *http.Request) {
 		userID := r.Context().Value(userIDKey).(int)
-		displayName, profilePicture, err := fetchBasicUserInfo(db, userID)
+		displayName, profilePicture, err := fetchBasicUserInfo(r.Context(), db, userID)
 		if err != nil {
 			writeError(w, http.StatusNotFound, "not_found")
 			return
@@ -310,7 +354,7 @@ func meProfileHandler(db *sql.DB) http.HandlerFunc {
 		var analogPassions, digitalDelights, otherBio, matchPreferences json.RawMessage
 		var isComplete sql.NullBool
 
-		err := db.QueryRow(`
+		err := db.QueryRowContext(r.Context(), `
 			SELECT display_name, about_me, profile_picture_file, location_city, location_lat, location_lon, 
 			       max_radius_km, analog_passions, digital_delights, collaboration_interests, favorite_food, 
 			       favorite_music, other_bio, match_preferences, is_complete
@@ -388,7 +432,7 @@ func meBioHandler(db *sql.DB) http.HandlerFunc {
 	return authenticate(func(w http.ResponseWriter, r *http.Request) {
 		userID := r.Context().Value(userIDKey).(int)
 		var analog, digital, seeking, interests json.RawMessage
-		err := db.QueryRow(`SELECT analog_passions, digital_delights, to_jsonb(collaboration_interests), to_jsonb(favorite_music) FROM profiles WHERE user_id = $1`, userID).Scan(&analog, &digital, &seeking, &interests)
+		err := db.QueryRowContext(r.Context(), `SELECT analog_passions, digital_delights, to_jsonb(collaboration_interests), to_jsonb(favorite_music) FROM profiles WHERE user_id = $1`, userID).Scan(&analog, &digital, &seeking, &interests)
 		if err != nil {
 			writeError(w, http.StatusNotFound, "not_found")
 			return

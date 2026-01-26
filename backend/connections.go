@@ -13,7 +13,7 @@ func connectionsHandler(db *sql.DB) http.HandlerFunc {
 	return authenticate(func(w http.ResponseWriter, r *http.Request) {
 		userID := r.Context().Value(userIDKey).(int)
 
-		rows, err := db.Query(`
+		rows, err := db.QueryContext(r.Context(), `
             SELECT 
                 CASE 
                     WHEN user_id = $1 THEN target_user_id
@@ -54,7 +54,7 @@ func requestsHandler(db *sql.DB) http.HandlerFunc {
 
 		userID := r.Context().Value(userIDKey).(int)
 
-		rows, err := db.Query(`
+		rows, err := db.QueryContext(r.Context(), `
 			SELECT user_id AS peer_user_id
 			FROM connections
 			WHERE target_user_id = $1 AND status = 'pending'
@@ -156,7 +156,7 @@ func requestConnectionHandler(db *sql.DB) http.HandlerFunc {
 
 		// Ensure target exists & is viewable/recommendable.
 		var exists bool
-		if err := db.QueryRow(`
+		if err := db.QueryRowContext(r.Context(), `
 			SELECT EXISTS (
 				SELECT 1
 				FROM users u
@@ -170,7 +170,7 @@ func requestConnectionHandler(db *sql.DB) http.HandlerFunc {
 
 		// Compute the "currently recommendable" boolean up-front.
 		// We *won't* enforce this yet; first we check for an opposite pending inside the tx.
-		isRec, err := isCurrentlyRecommendable(db, me, targetID)
+		isRec, err := isCurrentlyRecommendable(r.Context(), db, me, targetID)
 		if err != nil {
 			writeError(w, http.StatusInternalServerError, "db_error")
 			log.Println("isCurrentlyRecommendable error:", err)
@@ -195,7 +195,7 @@ func requestConnectionHandler(db *sql.DB) http.HandlerFunc {
 			// 1) Mutual-request rule: if THEY already requested ME and it's pending,
 			//    we auto-accept regardless of current recommendations.
 			if row != nil && row.Status == "pending" && row.UserID == targetID && row.TargetUserID == me {
-				if err := tx.QueryRow(`
+				if err := tx.QueryRowContext(r.Context(), `
 					UPDATE connections SET status = 'accepted' 
 					WHERE id = $1 RETURNING id`, row.ID,
 				).Scan(&resp.ConnectionID); err != nil {
@@ -239,7 +239,7 @@ func requestConnectionHandler(db *sql.DB) http.HandlerFunc {
 			}
 
 			// 4) Create new pending request
-			if err := tx.QueryRow(`
+			if err := tx.QueryRowContext(r.Context(), `
 				INSERT INTO connections (user_id, target_user_id, status)
 				VALUES ($1, $2, 'pending')
 				RETURNING id
@@ -298,7 +298,7 @@ func acceptConnectionHandler(db *sql.DB) http.HandlerFunc {
 
 		// Ensure target exists & profile complete.
 		var exists bool
-		if err := db.QueryRow(`
+		if err := db.QueryRowContext(r.Context(), `
 			SELECT EXISTS (
 				SELECT 1
 				FROM users u
@@ -335,7 +335,7 @@ func acceptConnectionHandler(db *sql.DB) http.HandlerFunc {
 				// Accept only if THEY requested ME (targetID -> me)
 				if row.UserID == targetID && row.TargetUserID == me {
 					// Return id of the now-accepted row
-					if err := tx.QueryRow(`
+					if err := tx.QueryRowContext(r.Context(), `
 					UPDATE connections
 					SET status = 'accepted'
 					WHERE id = $1
@@ -421,7 +421,7 @@ func declineConnectionHandler(db *sql.DB) http.HandlerFunc {
 
 		// Ensure target exists & profile complete.
 		var exists bool
-		if err := db.QueryRow(`
+		if err := db.QueryRowContext(r.Context(), `
 			SELECT EXISTS (
 				SELECT 1
 				FROM users u
@@ -459,7 +459,7 @@ func declineConnectionHandler(db *sql.DB) http.HandlerFunc {
 			case "pending":
 				// Valid decline only if THEY requested ME (targetID -> me).
 				if row.UserID == targetID && row.TargetUserID == me {
-					if _, err := tx.Exec(`UPDATE connections SET status = 'dismissed' WHERE id = $1`, row.ID); err != nil {
+					if _, err := tx.ExecContext(r.Context(), `UPDATE connections SET status = 'dismissed' WHERE id = $1`, row.ID); err != nil {
 						return err
 					}
 					resp.State = "dismissed"
@@ -529,7 +529,7 @@ func cancelConnectionRequestHandler(db *sql.DB) http.HandlerFunc {
 
 		// Ensure target exists & profile complete.
 		var exists bool
-		if err := db.QueryRow(`
+		if err := db.QueryRowContext(r.Context(), `
 			SELECT EXISTS (
 				SELECT 1
 				FROM users u
@@ -562,7 +562,7 @@ func cancelConnectionRequestHandler(db *sql.DB) http.HandlerFunc {
 			case "pending":
 				// Valid cancel only if I am the requester (me -> targetID).
 				if row.UserID == me && row.TargetUserID == targetID {
-					if _, err := tx.Exec(`UPDATE connections SET status = 'dismissed' WHERE id = $1`, row.ID); err != nil {
+					if _, err := tx.ExecContext(r.Context(), `UPDATE connections SET status = 'dismissed' WHERE id = $1`, row.ID); err != nil {
 						return err
 					}
 					resp.State = "dismissed"
@@ -631,7 +631,7 @@ func disconnectConnectionHandler(db *sql.DB) http.HandlerFunc {
 
 		// Ensure target exists & profile complete.
 		var exists bool
-		if err := db.QueryRow(`
+		if err := db.QueryRowContext(r.Context(), `
 			SELECT EXISTS (
 				SELECT 1
 				FROM users u
@@ -661,7 +661,7 @@ func disconnectConnectionHandler(db *sql.DB) http.HandlerFunc {
 			switch row.Status {
 			case "accepted":
 				// Valid: flip to disconnected
-				if _, err := tx.Exec(`UPDATE connections SET status = 'disconnected' WHERE id = $1`, row.ID); err != nil {
+				if _, err := tx.ExecContext(r.Context(), `UPDATE connections SET status = 'disconnected' WHERE id = $1`, row.ID); err != nil {
 					return err
 				}
 				okNoContent = true

@@ -34,8 +34,8 @@ func jsonRawOrArray(raw json.RawMessage) interface{} {
 	return v
 }
 
-func fetchBasicUserInfo(db *sql.DB, userID int) (displayName, profilePicture string, err error) {
-	err = db.QueryRow(`
+func fetchBasicUserInfo(ctx context.Context, db *sql.DB, userID int) (displayName, profilePicture string, err error) {
+	err = db.QueryRowContext(ctx, `
         SELECT
             COALESCE(p.display_name, 'User ' || u.id::text) AS display_name,
             COALESCE(p.profile_picture_file, 'avatar_placeholder.png') AS profile_picture_file
@@ -46,9 +46,9 @@ func fetchBasicUserInfo(db *sql.DB, userID int) (displayName, profilePicture str
 	return
 }
 
-func fetchProfileInfo(db *sql.DB, userID int) (aboutMe, displayName, profilePicture string, err error) {
+func fetchProfileInfo(ctx context.Context, db *sql.DB, userID int) (aboutMe, displayName, profilePicture string, err error) {
 	var profilePictureSQL sql.NullString
-	err = db.QueryRow(
+	err = db.QueryRowContext(ctx,
 		"SELECT about_me, display_name, profile_picture_file FROM profiles WHERE user_id = $1",
 		userID,
 	).Scan(&aboutMe, &displayName, &profilePictureSQL)

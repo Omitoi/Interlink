@@ -32,5 +32,6 @@ require (
 	github.com/hashicorp/golang-lru/v2 v2.0.7 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/sosodev/duration v1.3.1 // indirect
+	golang.org/x/sync v0.19.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"database/sql"
 	"net/http"
 	"strconv"
@@ -20,7 +21,7 @@ func recommendationsHandler(db *sql.DB) http.HandlerFunc {
 			writeError(w, http.StatusInternalServerError, "db_error")
 			return
 		}
-		recommendations, err := getRecommendedUserIDs(db, userID)
+		recommendations, err := getRecommendedUserIDs(r.Context(), db, userID)
 		if err != nil {
 			writeError(w, http.StatusInternalServerError, "recommendation_error")
 			return
@@ -65,7 +66,7 @@ func recommendationsDetailedHandler(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		results, err := getRecommendationsWithScores(db, userID)
+		results, err := getRecommendationsWithScores(r.Context(), db, userID)
 		if err != nil {
 			writeError(w, http.StatusInternalServerError, "recommendation_error")
 			return
@@ -136,8 +137,8 @@ func dismissRecommendationHandler(db *sql.DB) http.HandlerFunc {
 // isCurrentlyRecommendable returns true if targetID is in the *current*
 // recommendations for `me`, after subtracting any users the caller has dismissed.
 // This mirrors the /recommendations filtering so the policy is consistent.
-func isCurrentlyRecommendable(db *sql.DB, me, targetID int) (bool, error) {
-	recs, err := getRecommendedUserIDs(db, me)
+func isCurrentlyRecommendable(ctx context.Context, db *sql.DB, me, targetID int) (bool, error) {
+	recs, err := getRecommendedUserIDs(ctx, db, me)
 	if err != nil {
 		return false, err
 	}
@@ -147,7 +148,7 @@ func isCurrentlyRecommendable(db *sql.DB, me, targetID int) (bool, error) {
 		recSet[id] = struct{}{}
 	}
 	// Remove dismissed
-	rows, derr := db.Query(`SELECT dismissed_user_id FROM dismissed_recommendations WHERE user_id = $1`, me)
+	rows, derr := db.QueryContext(ctx, `SELECT dismissed_user_id FROM dismissed_recommendations WHERE user_id = $1`, me)
 	if derr == nil {
 		defer rows.Close()
 		for rows.Next() {

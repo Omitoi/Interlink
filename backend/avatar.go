@@ -146,7 +146,7 @@ func getUserAvatarHandler(db *sql.DB) http.HandlerFunc {
 
 			// Check if the requested user is recommendable and if so, allow viewing
 			if !ok {
-				ok, _ = isCurrentlyRecommendable(db, me, targetID)
+				ok, _ = isCurrentlyRecommendable(r.Context(), db, me, targetID)
 			}
 			if !ok {
 				// 404 so that the file existence is not revealed to bad actors

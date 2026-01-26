@@ -94,7 +94,7 @@ ORDER BY COALESCE(cp.last_message_at, to_timestamp(0)) DESC, u.id ASC
 			s.LastMessageAt = last
 			s.UnreadMessages = unread
 
-			IsOnline, errIsOnline := isOnlineNow(db, s.UserID)
+			IsOnline, errIsOnline := isOnlineNow(r.Context(), db, s.UserID)
 			if errIsOnline != nil {
 				s.IsOnline = false
 			} else {

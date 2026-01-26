@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -19,7 +20,7 @@ func TestSaveChatMsg(t *testing.T) {
 	createTestProfile(t, user2, testProfile)
 	createConnection(t, user1.ID, user2.ID, "accepted")
 
-	msgID, chatID, timestamp, err := saveChatMsg(db, user1.ID, user2.ID, "Hello")
+	msgID, chatID, timestamp, err := saveChatMsg(context.Background(), db, user1.ID, user2.ID, "Hello")
 	if err != nil {
 		t.Fatalf("Failed to save chat message: %v", err)
 	}
@@ -36,7 +37,7 @@ func TestSaveChatMsg(t *testing.T) {
 	// Test no connection
 	user3 := createTestUser(t, "savechat3@example.com", "password123")
 	createTestProfile(t, user3, testProfile)
-	_, _, _, err = saveChatMsg(db, user1.ID, user3.ID, "Should fail")
+	_, _, _, err = saveChatMsg(context.Background(), db, user1.ID, user3.ID, "Should fail")
 	if err == nil {
 		t.Error("Expected error for users without connection")
 	}
@@ -55,17 +56,17 @@ func TestGetChatMessages(t *testing.T) {
 	createConnection(t, user1.ID, user2.ID, "accepted")
 
 	// Save test messages
-	msg1ID, _, _, err := saveChatMsg(db, user1.ID, user2.ID, "First message")
+	msg1ID, _, _, err := saveChatMsg(context.Background(), db, user1.ID, user2.ID, "First message")
 	if err != nil {
 		t.Fatalf("Failed to save first message: %v", err)
 	}
 	time.Sleep(10 * time.Millisecond)
-	msg2ID, _, _, err := saveChatMsg(db, user2.ID, user1.ID, "Second message")
+	msg2ID, _, _, err := saveChatMsg(context.Background(), db, user2.ID, user1.ID, "Second message")
 	if err != nil {
 		t.Fatalf("Failed to save second message: %v", err)
 	}
 
-	messages, err := getChatMessages(db, user1.ID, user2.ID, 10, nil)
+	messages, err := getChatMessages(context.Background(), db, user1.ID, user2.ID, 10, nil)
 	if err != nil {
 		t.Fatalf("Failed to get chat messages: %v", err)
 	}
@@ -130,11 +131,11 @@ func TestGetChatHistoryHandler(t *testing.T) {
 	createConnection(t, user1.ID, user2.ID, "accepted")
 
 	// Save test messages
-	_, _, _, err := saveChatMsg(db, user1.ID, user2.ID, "Test message 1")
+	_, _, _, err := saveChatMsg(context.Background(), db, user1.ID, user2.ID, "Test message 1")
 	if err != nil {
 		t.Fatalf("Failed to save test message 1: %v", err)
 	}
-	_, _, _, err = saveChatMsg(db, user2.ID, user1.ID, "Test message 2")
+	_, _, _, err = saveChatMsg(context.Background(), db, user2.ID, user1.ID, "Test message 2")
 	if err != nil {
 		t.Fatalf("Failed to save test message 2: %v", err)
 	}
@@ -239,11 +240,11 @@ func TestChatSummaryHandler(t *testing.T) {
 	createConnection(t, user1.ID, user3.ID, "accepted")
 
 	// Send some messages to create chat history
-	_, _, _, err := saveChatMsg(db, user2.ID, user1.ID, "Hello from user2")
+	_, _, _, err := saveChatMsg(context.Background(), db, user2.ID, user1.ID, "Hello from user2")
 	if err != nil {
 		t.Fatalf("Failed to save message: %v", err)
 	}
-	_, _, _, err = saveChatMsg(db, user3.ID, user1.ID, "Hello from user3")
+	_, _, _, err = saveChatMsg(context.Background(), db, user3.ID, user1.ID, "Hello from user3")
 	if err != nil {
 		t.Fatalf("Failed to save message: %v", err)
 	}
@@ -321,7 +322,7 @@ func TestChatsMarkReadHandler(t *testing.T) {
 	createConnection(t, user1.ID, user2.ID, "accepted")
 
 	// Send message from user2 to user1 (creates unread for user1)
-	_, chatID, _, err := saveChatMsg(db, user2.ID, user1.ID, "Unread message")
+	_, chatID, _, err := saveChatMsg(context.Background(), db, user2.ID, user1.ID, "Unread message")
 	if err != nil {
 		t.Fatalf("Failed to save message: %v", err)
 	}
