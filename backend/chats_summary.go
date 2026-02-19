@@ -22,12 +22,8 @@ type ChatPeerSummary struct {
 // Returns all "accepted" connections to the logged in user and for each peer:
 // name, picture, latest message and unread count
 func chatSummaryHandler(db *sql.DB) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		userID, ok := getUserIDFromBearer(r)
-		if !ok {
-			http.Error(w, "Unauthorized", http.StatusUnauthorized)
-			return
-		}
+	return authenticate(func(w http.ResponseWriter, r *http.Request) {
+		userID := r.Context().Value(userIDKey).(int)
 
 		// CTEs for clarity.
 		// 1) accepted = all peer ids
@@ -72,7 +68,7 @@ ORDER BY COALESCE(cp.last_message_at, to_timestamp(0)) DESC, u.id ASC
 
 		rows, err := db.Query(q, userID)
 		if err != nil {
-			http.Error(w, "failed to query chat summary", http.StatusInternalServerError)
+			writeError(w, http.StatusInternalServerError, "failed to query chat summary")
 			return
 		}
 		defer rows.Close()
@@ -86,7 +82,7 @@ ORDER BY COALESCE(cp.last_message_at, to_timestamp(0)) DESC, u.id ASC
 			var unread int
 
 			if err := rows.Scan(&s.UserID, &name, &pic, &last, &unread); err != nil {
-				http.Error(w, "failed to scan chat summary", http.StatusInternalServerError)
+				writeError(w, http.StatusInternalServerError, "failed to scan chat summary")
 				return
 			}
 			s.UserName = name
@@ -103,36 +99,33 @@ ORDER BY COALESCE(cp.last_message_at, to_timestamp(0)) DESC, u.id ASC
 			summaries = append(summaries, s)
 		}
 		if err := rows.Err(); err != nil {
-			http.Error(w, "failed to read chat summary rows", http.StatusInternalServerError)
+			writeError(w, http.StatusInternalServerError, "failed to read chat summary rows")
 			return
 		}
 
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(summaries)
-	}
+	})
 }
 
 // POST /chats/read?peer_id=123
 // For receiving the ack from frontend that a message has been read
 func chatsMarkReadHandler(db *sql.DB) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
+	return authenticate(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
-			http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+			writeError(w, http.StatusMethodNotAllowed, "method_not_allowed")
 			return
 		}
-		userID, ok := getUserIDFromBearer(r)
-		if !ok {
-			http.Error(w, "Unauthorized", http.StatusUnauthorized)
-			return
-		}
+		userID := r.Context().Value(userIDKey).(int)
+
 		peerStr := r.URL.Query().Get("peer_id")
 		peerID, err := strconv.Atoi(peerStr)
 		if err != nil || peerID <= 0 {
-			http.Error(w, "bad peer_id", http.StatusBadRequest)
+			writeError(w, http.StatusBadRequest, "bad_peer_id")
 			return
 		}
 
-		// Resolve chat_is for this pair
+		// Resolve chat_id for this pair
 		var chatID int
 		err = db.QueryRow(`
 			SELECT id
@@ -147,25 +140,11 @@ func chatsMarkReadHandler(db *sql.DB) http.HandlerFunc {
 			return
 		}
 		if err != nil {
-			http.Error(w, "db error", http.StatusInternalServerError)
+			writeError(w, http.StatusInternalServerError, "db_error")
 			return
 		}
 
-		// Mark the messages from peer to you as read
-		_, _ = db.Exec(`
-			UPDATE messages
-			SET is_read = TRUE
-			WHERE chat_id = $1 AND sender_id = $2 AND is_read IS FALSE
-		`, chatID, peerID)
-
-		// Clear the unread flag for you in this chat
-		_, _ = db.Exec(`
-			UPDATE chats c
-			SET unread_for_user1 = CASE WHEN $1 = c.user1_id THEN FALSE ELSE unread_for_user1 END,
-			    unread_for_user2 = CASE WHEN $1 = c.user2_id THEN FALSE ELSE unread_for_user2 END
-			WHERE c.id = $2
-		`, userID, chatID)
-
+		markChatAsRead(db, chatID, userID, peerID)
 		w.WriteHeader(http.StatusNoContent)
-	}
+	})
 }

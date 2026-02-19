@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"log"
@@ -92,16 +93,7 @@ func userProfileHandler(db *sql.DB) http.HandlerFunc {
 		requesterID := r.Context().Value(userIDKey).(int)
 
 		// Permission check: Only allow if recommended, pending/accepted connection, or connected
-		allowed := false
-		var count int
-		err = db.QueryRowContext(r.Context(), `
-            SELECT COUNT(*) FROM connections
-            WHERE ((user_id = $1 AND target_user_id = $2) OR (user_id = $2 AND target_user_id = $1))
-            AND status IN ('accepted', 'pending')
-        `, requesterID, targetID).Scan(&count)
-		if err == nil && count > 0 {
-			allowed = true
-		}
+		allowed := canViewUser(r.Context(), db, requesterID, targetID)
 		if !allowed {
 			recs, err := getRecommendedUserIDs(r.Context(), db, requesterID)
 			if err == nil {
@@ -219,12 +211,7 @@ func userBioHandler(db *sql.DB) http.HandlerFunc {
 		}
 		requesterID := r.Context().Value(userIDKey).(int)
 		// Reuse permission strategy: connections or recommendations
-		allowed := false
-		var count int
-		_ = db.QueryRowContext(r.Context(), `SELECT COUNT(*) FROM connections WHERE ((user_id = $1 AND target_user_id = $2) OR (user_id = $2 AND target_user_id = $1)) AND status IN ('accepted','pending')`, requesterID, targetID).Scan(&count)
-		if count > 0 {
-			allowed = true
-		}
+		allowed := canViewUser(r.Context(), db, requesterID, targetID)
 		if !allowed {
 			if recs, err := getRecommendedUserIDs(r.Context(), db, requesterID); err == nil {
 				for _, id := range recs {
@@ -445,4 +432,14 @@ func meBioHandler(db *sql.DB) http.HandlerFunc {
 			"interests":        jsonRawOrArray(interests),
 		})
 	})
+}
+
+func canViewUser(ctx context.Context, db *sql.DB, viewerID, targetID int) bool {
+    var count int
+    err := db.QueryRowContext(ctx, `
+        SELECT COUNT(*) FROM connections
+        WHERE ((user_id = $1 AND target_user_id = $2) OR (user_id = $2 AND target_user_id = $1))
+        AND status IN ('accepted', 'pending')
+    `, viewerID, targetID).Scan(&count)
+    return err == nil && count > 0
 }

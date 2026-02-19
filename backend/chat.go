@@ -42,6 +42,7 @@ type Client struct {
 	db     *sql.DB
 }
 
+
 // Hub manages WebSocket client connections
 type Hub struct {
 	clientsByUser map[int]map[*Client]bool
@@ -99,12 +100,12 @@ var upgrader = websocket.Upgrader{
 var chatHub = newHub()
 
 func wsChatHandler(db *sql.DB) http.HandlerFunc {
-	// We'll authenticate using the existing JWT middleware logic inline here
+	// WebSocket upgrade hijacks the response, so we cannot use the authenticate() wrapper.
+	// Auth is handled inline via getUserIDFromRequest.
 	return func(w http.ResponseWriter, r *http.Request) {
-		// Reuse the authenticate() behavior inline:
 		userID, ok := getUserIDFromRequest(r)
 		if !ok {
-			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+			writeError(w, http.StatusUnauthorized, "unauthorized")
 			return
 		}
 
@@ -184,6 +185,7 @@ func jwtParse(s string) (*jwt.Token, error) {
 	return jwt.Parse(s, func(token *jwt.Token) (any, error) { return jwtSecret, nil })
 }
 
+// Client reader
 func clientReader(c *Client) {
 	defer func() {
 		chatHub.unregister(c)
@@ -251,6 +253,7 @@ func clientReader(c *Client) {
 	}
 }
 
+// Client writer
 func clientWriter(c *Client) {
 	ticker := time.NewTicker(30 * time.Second)
 	defer func() {
@@ -428,31 +431,15 @@ func getChatMessages(ctx context.Context, db *sql.DB, userID int, otherUserID in
 	}
 
 	// 3) Set all messages from the other user as read and clear unread flag for this user
-	_, _ = db.ExecContext(ctx, `
-		UPDATE messages
-		SET is_read = TRUE
-		WHERE chat_id = $1 AND sender_id <> $2 AND is_read IS FALSE
-	`, chatID, userID)
-
-	_, _ = db.ExecContext(ctx, `
-		UPDATE chats c
-		SET unread_for_user1 = CASE WHEN $2 = c.user1_id THEN FALSE ELSE unread_for_user1 END,
-			unread_for_user2 = CASE WHEN $2 = c.user2_id THEN FALSE ELSE unread_for_user2 END
-		WHERE c.id = $1
-	`, chatID, userID)
+	markChatAsRead(db, chatID, userID, otherUserID)
 
 	return msgs, nil
 }
 
 // GET /chats/{otherUserId}/messages?limit=50&before=2025-09-16T08:00:00Z
 func getChatHistoryHandler(db *sql.DB) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		// auth: same logic as in everywhere else
-		userID, ok := getUserIDFromBearer(r)
-		if !ok {
-			http.Error(w, "Unauthorized", http.StatusUnauthorized)
-			return
-		}
+	return authenticate(func(w http.ResponseWriter, r *http.Request) {
+		userID := r.Context().Value(userIDKey).(int)
 
 		parts := strings.Split(strings.Trim(r.URL.Path, "/"), "/")
 		if len(parts) != 3 || parts[0] != "chats" || parts[2] != "messages" {
@@ -461,7 +448,7 @@ func getChatHistoryHandler(db *sql.DB) http.HandlerFunc {
 		}
 		otherID, err := strconv.Atoi(parts[1])
 		if err != nil {
-			http.Error(w, "bad user id", http.StatusBadRequest)
+			writeError(w, http.StatusBadRequest, "bad_user_id")
 			return
 		}
 
@@ -481,12 +468,27 @@ func getChatHistoryHandler(db *sql.DB) http.HandlerFunc {
 
 		msgs, err := getChatMessages(r.Context(), db, userID, otherID, limit, beforePtr)
 		if err != nil {
-			http.Error(w, "failed to fetch messages", http.StatusInternalServerError)
-
+			writeError(w, http.StatusInternalServerError, "failed_to_fetch_messages")
 			return
 		}
 
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(msgs)
-	}
+	})
+}
+
+func markChatAsRead(db *sql.DB, chatID, readerUserID, senderUserID int) error {
+	_, _ = db.Exec(`
+    UPDATE messages
+    SET is_read = TRUE
+    WHERE chat_id = $1 AND sender_id = $2 AND is_read IS FALSE
+`, chatID, senderUserID)
+
+	_, _ = db.Exec(`
+    UPDATE chats c
+    SET unread_for_user1 = CASE WHEN $1 = c.user1_id THEN FALSE ELSE unread_for_user1 END,
+        unread_for_user2 = CASE WHEN $1 = c.user2_id THEN FALSE ELSE unread_for_user2 END
+    WHERE c.id = $2
+`, readerUserID, chatID)
+	return nil
 }

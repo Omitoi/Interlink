@@ -13,7 +13,7 @@ const ProfileGate: React.FC<Props> = ({ children }) => {
   // If request errored (not 404), fail softly — let the page render
   if (error) return <div style={{ padding: 24, color: "#b00" }}>{error}</div>;
 
-  if (isComplete === false) {
+  if (!isComplete) {
     // Redirect to /profile to complete it
     return (
       <Navigate

@@ -6,7 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"log"
-	"net/http"
+	"net/http"	
 	"strings"
 	"time"
 
@@ -43,6 +43,7 @@ func registerHandler(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
+		// Clean up input
 		req.Email = strings.TrimSpace(req.Email)
 		req.Password = strings.TrimSpace(req.Password)
 		if req.Email == "" || req.Password == "" {
@@ -57,10 +58,11 @@ func registerHandler(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		res, err := db.ExecContext(r.Context(),
-			"INSERT INTO users (email, password_hash) VALUES ($1, $2)",
+		var newID int
+		err = db.QueryRowContext(r.Context(),
+			"INSERT INTO users (email, password_hash) VALUES ($1, $2) RETURNING id",
 			req.Email, string(hashedPassword),
-		)
+		).Scan(&newID)
 		if err != nil {
 			var pqErr *pq.Error
 			if errors.As(err, &pqErr) && pqErr.Code == "23505" { // unique_violation
@@ -69,15 +71,7 @@ func registerHandler(db *sql.DB) http.HandlerFunc {
 			}
 			writeError(w, http.StatusInternalServerError, "register_error")
 			log.Println("Error saving user to database:", err)
-
 			return
-		}
-		var newID int
-		// Try RETURNING alternative if LastInsertId unsupported (Postgres): re-query
-		if id, err := res.LastInsertId(); err == nil {
-			newID = int(id)
-		} else {
-			_ = db.QueryRowContext(r.Context(), "SELECT id FROM users WHERE email = $1", req.Email).Scan(&newID)
 		}
 
 		// Update last_online for the new user
@@ -89,7 +83,7 @@ func registerHandler(db *sql.DB) http.HandlerFunc {
 		// Generate JWT token for automatic login
 		token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
 			"user_id": newID,
-			"expires": time.Now().Add(24 * time.Hour).Unix(),
+			"exp":     time.Now().Add(24 * time.Hour).Unix(),
 		})
 		tokenString, err := token.SignedString(jwtSecret)
 		if err != nil {
@@ -155,11 +149,11 @@ func loginHandler(db *sql.DB) http.HandlerFunc {
 		// Generate JWT token
 		token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
 			"user_id": userID,
-			"expires": time.Now().Add(24 * time.Hour).Unix(),
+			"exp":     time.Now().Add(24 * time.Hour).Unix(),
 		})
 		tokenString, err := token.SignedString(jwtSecret)
 		if err != nil {
-			http.Error(w, "Error generating token", http.StatusInternalServerError)
+			writeError(w, http.StatusInternalServerError, "token_generation_error")
 			log.Println("Error generating token:", err)
 			return
 		}
@@ -172,7 +166,7 @@ func authenticate(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		authHeader := r.Header.Get("Authorization")
 		if !strings.HasPrefix(authHeader, "Bearer ") {
-			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+			writeError(w, http.StatusUnauthorized, "unauthorized")
 			return
 		}
 		tokenStr := strings.TrimPrefix(authHeader, "Bearer ")
@@ -180,17 +174,17 @@ func authenticate(next http.HandlerFunc) http.HandlerFunc {
 			return jwtSecret, nil
 		})
 		if err != nil || !token.Valid {
-			http.Error(w, "Invalid token", http.StatusUnauthorized)
+			writeError(w, http.StatusUnauthorized, "invalid_token")
 			return
 		}
 		claims, ok := token.Claims.(jwt.MapClaims)
 		if !ok {
-			http.Error(w, "Invalid token claims", http.StatusUnauthorized)
+			writeError(w, http.StatusUnauthorized, "invalid_token_claims")
 			return
 		}
 		userID, ok := claims["user_id"].(float64)
 		if !ok {
-			http.Error(w, "Invalid user ID in token", http.StatusUnauthorized)
+			writeError(w, http.StatusUnauthorized, "invalid_user_id_in_token")
 			return
 		}
 		// Update last_online

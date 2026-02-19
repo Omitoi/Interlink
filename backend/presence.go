@@ -7,20 +7,16 @@ import (
 )
 
 func mePingHandler(db *sql.DB) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
+	return authenticate(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
-			http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+			writeError(w, http.StatusMethodNotAllowed, "method_not_allowed")
 			return
 		}
-		userID, ok := getUserIDFromBearer(r)
-		if !ok {
-			http.Error(w, "Unauthorized", http.StatusUnauthorized)
-			return
-		}
+		userID := r.Context().Value(userIDKey).(int)
 
 		_, _ = db.Exec(`UPDATE users SET last_online = NOW() WHERE id = $1`, userID)
 		w.WriteHeader(http.StatusNoContent)
-	}
+	})
 }
 
 func isOnlineNow(ctx context.Context, db *sql.DB, userID int) (bool, error) {

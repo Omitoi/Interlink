@@ -10,6 +10,16 @@ import (
 	"time"
 )
 
+// ConnectionRow represents a connection between two users
+type ConnectionRow struct {
+	ID           int
+	UserID       int // requester
+	TargetUserID int // addressee
+	Status       string
+	CreatedAt    time.Time
+	UpdatedAt    time.Time
+}
+
 // --- Response helpers ---
 func writeJSON(w http.ResponseWriter, status int, payload interface{}) {
 	w.Header().Set("Content-Type", "application/json")
@@ -85,17 +95,7 @@ func withTx(ctx context.Context, db *sql.DB, fn func(tx *sql.Tx) error) error {
 	return tx.Commit()
 }
 
-// ConnectionRow represents a connection between two users
-type ConnectionRow struct {
-	ID           int
-	UserID       int // requester
-	TargetUserID int // addressee
-	Status       string
-	CreatedAt    time.Time
-	UpdatedAt    time.Time
-}
-
-// loadPairForUpdate returns the *latest* connection row between two users
+// loadPairForUpdate returns the latest connection row between two users
 // (in EITHER direction), and takes a row lock (`FOR UPDATE`) so no other
 // concurrent request can modify it until our transaction finishes.
 //   - Returns (nil, nil) if no row exists yet.

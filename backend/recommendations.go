@@ -26,27 +26,6 @@ func recommendationsHandler(db *sql.DB) http.HandlerFunc {
 			writeError(w, http.StatusInternalServerError, "recommendation_error")
 			return
 		}
-		// Filter out dismissed recommendations
-		if len(recommendations) > 0 {
-			rows, derr := db.Query(`SELECT dismissed_user_id FROM dismissed_recommendations WHERE user_id = $1`, userID)
-			if derr == nil {
-				defer rows.Close()
-				dismissed := make(map[int]struct{})
-				for rows.Next() {
-					var d int
-					if rows.Scan(&d) == nil {
-						dismissed[d] = struct{}{}
-					}
-				}
-				filtered := make([]int, 0, len(recommendations))
-				for _, id := range recommendations {
-					if _, gone := dismissed[id]; !gone {
-						filtered = append(filtered, id)
-					}
-				}
-				recommendations = filtered
-			}
-		}
 		writeJSON(w, http.StatusOK, map[string][]int{"recommendations": recommendations})
 	})
 }
@@ -70,28 +49,6 @@ func recommendationsDetailedHandler(db *sql.DB) http.HandlerFunc {
 		if err != nil {
 			writeError(w, http.StatusInternalServerError, "recommendation_error")
 			return
-		}
-
-		// Filter out dismissed recommendations
-		if len(results) > 0 {
-			rows, derr := db.Query(`SELECT dismissed_user_id FROM dismissed_recommendations WHERE user_id = $1`, userID)
-			if derr == nil {
-				defer rows.Close()
-				dismissed := make(map[int]struct{})
-				for rows.Next() {
-					var d int
-					if rows.Scan(&d) == nil {
-						dismissed[d] = struct{}{}
-					}
-				}
-				filtered := make([]RecommendationResult, 0, len(results))
-				for _, result := range results {
-					if _, gone := dismissed[result.UserID]; !gone {
-						filtered = append(filtered, result)
-					}
-				}
-				results = filtered
-			}
 		}
 
 		writeJSON(w, http.StatusOK, map[string][]RecommendationResult{"recommendations": results})
@@ -146,17 +103,6 @@ func isCurrentlyRecommendable(ctx context.Context, db *sql.DB, me, targetID int)
 	recSet := make(map[int]struct{}, len(recs))
 	for _, id := range recs {
 		recSet[id] = struct{}{}
-	}
-	// Remove dismissed
-	rows, derr := db.QueryContext(ctx, `SELECT dismissed_user_id FROM dismissed_recommendations WHERE user_id = $1`, me)
-	if derr == nil {
-		defer rows.Close()
-		for rows.Next() {
-			var d int
-			if rows.Scan(&d) == nil {
-				delete(recSet, d)
-			}
-		}
 	}
 	_, ok := recSet[targetID]
 	return ok, nil

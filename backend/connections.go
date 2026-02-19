@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"log"
@@ -9,6 +10,8 @@ import (
 	"strings"
 )
 
+// Handler function that returns all the user ids with which the user has accepted connections
+// Used for listing all the users that the user has accepted connections with
 func connectionsHandler(db *sql.DB) http.HandlerFunc {
 	return authenticate(func(w http.ResponseWriter, r *http.Request) {
 		userID := r.Context().Value(userIDKey).(int)
@@ -155,15 +158,8 @@ func requestConnectionHandler(db *sql.DB) http.HandlerFunc {
 		}
 
 		// Ensure target exists & is viewable/recommendable.
-		var exists bool
-		if err := db.QueryRowContext(r.Context(), `
-			SELECT EXISTS (
-				SELECT 1
-				FROM users u
-				JOIN profiles p ON p.user_id = u.id
-				WHERE u.id = $1 AND COALESCE(p.is_complete, FALSE) = TRUE
-			)
-		`, targetID).Scan(&exists); err != nil || !exists {
+		exists, err := targetExistsAndComplete(r.Context(), db, targetID)
+		if err != nil || !exists {
 			writeError(w, http.StatusNotFound, "not_found")
 			return
 		}
@@ -205,33 +201,33 @@ func requestConnectionHandler(db *sql.DB) http.HandlerFunc {
 				return nil
 			}
 
-			// 2) Handle existing connection states before enforcing recommendation policy
+			// 2) Handle edge cases
 			if row != nil {
-				// There is already a row (some state) between us.
+				// Already sent a request.
 				switch row.Status {
 				case "pending":
 					resp.State = "pending"
 					resp.ConnectionID = &row.ID
 					return nil
-
 				case "accepted":
-					// Already connected -> idempotent OK
+					// Already connected.
 					resp.State = "accepted"
 					resp.ConnectionID = &row.ID
 					return nil
 				case "dismissed", "disconnected":
+					// Already dismissed or disconnected.
 					writeError(w, http.StatusConflict, "invalid_state")
 					wroteErr = true
 					return nil
 				default:
-					// Unknown enum value
+					// Unknown enum value.
 					writeError(w, http.StatusConflict, "invalid_state")
 					wroteErr = true
 					return nil
 				}
 			}
 
-			// 3) No existing row - enforce recommendation policy for new connections
+			// 3) Weren't recommended (someone clever called an ID to request)
 			if !isRec {
 				writeError(w, http.StatusNotFound, "not_found")
 				wroteErr = true
@@ -297,15 +293,8 @@ func acceptConnectionHandler(db *sql.DB) http.HandlerFunc {
 		}
 
 		// Ensure target exists & profile complete.
-		var exists bool
-		if err := db.QueryRowContext(r.Context(), `
-			SELECT EXISTS (
-				SELECT 1
-				FROM users u
-				JOIN profiles p ON p.user_id = u.id
-				WHERE u.id = $1 AND COALESCE(p.is_complete, FALSE) = TRUE
-			)
-		`, targetID).Scan(&exists); err != nil || !exists {
+		exists, err := targetExistsAndComplete(r.Context(), db, targetID)
+		if err != nil || !exists {
 			writeError(w, http.StatusNotFound, "not_found")
 			return
 		}
@@ -420,15 +409,8 @@ func declineConnectionHandler(db *sql.DB) http.HandlerFunc {
 		}
 
 		// Ensure target exists & profile complete.
-		var exists bool
-		if err := db.QueryRowContext(r.Context(), `
-			SELECT EXISTS (
-				SELECT 1
-				FROM users u
-				JOIN profiles p ON p.user_id = u.id
-				WHERE u.id = $1 AND COALESCE(p.is_complete, FALSE) = TRUE
-			)
-		`, targetID).Scan(&exists); err != nil || !exists {
+		exists, err := targetExistsAndComplete(r.Context(), db, targetID)
+		if err != nil || !exists {
 			log.Println("Error accessing database: ", err)
 			if !exists {
 				log.Println(targetID, " does not exist.")
@@ -528,15 +510,8 @@ func cancelConnectionRequestHandler(db *sql.DB) http.HandlerFunc {
 		}
 
 		// Ensure target exists & profile complete.
-		var exists bool
-		if err := db.QueryRowContext(r.Context(), `
-			SELECT EXISTS (
-				SELECT 1
-				FROM users u
-				JOIN profiles p ON p.user_id = u.id
-				WHERE u.id = $1 AND COALESCE(p.is_complete, FALSE) = TRUE
-			)
-		`, targetID).Scan(&exists); err != nil || !exists {
+		exists, err := targetExistsAndComplete(r.Context(), db, targetID)
+		if err != nil || !exists {
 			writeError(w, http.StatusNotFound, "not_found")
 			return
 		}
@@ -630,15 +605,8 @@ func disconnectConnectionHandler(db *sql.DB) http.HandlerFunc {
 		}
 
 		// Ensure target exists & profile complete.
-		var exists bool
-		if err := db.QueryRowContext(r.Context(), `
-			SELECT EXISTS (
-				SELECT 1
-				FROM users u
-				JOIN profiles p ON p.user_id = u.id
-				WHERE u.id = $1 AND COALESCE(p.is_complete, FALSE) = TRUE
-			)
-		`, targetID).Scan(&exists); err != nil || !exists {
+		exists, err := targetExistsAndComplete(r.Context(), db, targetID)
+		if err != nil || !exists {
 			writeError(w, http.StatusNotFound, "not_found")
 			return
 		}
@@ -694,4 +662,17 @@ func disconnectConnectionHandler(db *sql.DB) http.HandlerFunc {
 			w.WriteHeader(http.StatusNoContent)
 		}
 	})
+}
+
+func targetExistsAndComplete(ctx context.Context, db *sql.DB, targetID int) (bool, error) {
+	var exists bool
+	err := db.QueryRowContext(ctx, `
+			SELECT EXISTS (
+				SELECT 1
+				FROM users u
+				JOIN profiles p ON p.user_id = u.id
+				WHERE u.id = $1 AND COALESCE(p.is_complete, FALSE) = TRUE
+			)
+		`, targetID).Scan(&exists)
+	return exists, err
 }

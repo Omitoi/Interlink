@@ -386,6 +386,15 @@ func getRecommendationsWithScores(ctx context.Context, db *sql.DB, userID int) (
 	}
 	var candidates []candidateScore
 
+	// Calculate maximum possible score for percentage calculation
+	maxPossibleScore := 0
+	for _, weight := range userProfile.MatchPreferences {
+		maxPossibleScore += weight
+	}
+	if maxPossibleScore == 0 {
+		maxPossibleScore = 1 // Avoid division by zero
+	}
+
 	for rows.Next() {
 		var c Profile
 		var analog, digital []byte
@@ -403,8 +412,6 @@ func getRecommendationsWithScores(ctx context.Context, db *sql.DB, userID int) (
 		if userProfile.MaxRadiusKm > 0 && distance > float64(userProfile.MaxRadiusKm) {
 			continue // Skip candidates outside radius
 		}
-		json.Unmarshal(analog, &c.AnalogPassions)
-		json.Unmarshal(digital, &c.DigitalDelights)
 
 		score := 0
 
@@ -441,15 +448,6 @@ func getRecommendationsWithScores(ctx context.Context, db *sql.DB, userID int) (
 			score += locationScore
 		}
 
-		// Calculate percentage for threshold check
-		maxPossibleScore := 0
-		for _, weight := range userProfile.MatchPreferences {
-			maxPossibleScore += weight
-		}
-		if maxPossibleScore == 0 {
-			maxPossibleScore = 1 // Avoid division by zero
-		}
-
 		percentage := (float64(score) / float64(maxPossibleScore)) * 100
 		if percentage > 100 {
 			percentage = 100
@@ -464,15 +462,6 @@ func getRecommendationsWithScores(ctx context.Context, db *sql.DB, userID int) (
 	sort.Slice(candidates, func(i, j int) bool {
 		return candidates[i].Score > candidates[j].Score
 	})
-
-	// Calculate maximum possible score for percentage calculation (already calculated above)
-	maxPossibleScore := 0
-	for _, weight := range userProfile.MatchPreferences {
-		maxPossibleScore += weight
-	}
-	if maxPossibleScore == 0 {
-		maxPossibleScore = 1 // Avoid division by zero
-	}
 
 	var results []RecommendationResult
 	for i := 0; i < len(candidates) && i < 10; i++ {

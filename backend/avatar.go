@@ -24,7 +24,7 @@ func myAvatarHandler(db *sql.DB) http.HandlerFunc {
 		// Remove avatar if method is DELETE
 		if r.Method == http.MethodDelete {
 			if err := removeAvatar(db, me); err != nil {
-				http.Error(w, "remove_failed", http.StatusInternalServerError)
+				writeError(w, http.StatusInternalServerError, "remove_failed")
 				return
 			}
 			writeJSON(w, http.StatusOK, map[string]any{"ok": true})
@@ -32,19 +32,19 @@ func myAvatarHandler(db *sql.DB) http.HandlerFunc {
 
 		}
 		if r.Method != http.MethodPost {
-			http.Error(w, "method_not_allowed", http.StatusMethodNotAllowed)
+			writeError(w, http.StatusMethodNotAllowed, "method_not_allowed")
 			return
 		}
 
 		// Limit to ~3MB
 		r.Body = http.MaxBytesReader(w, r.Body, 3<<20)
 		if err := r.ParseMultipartForm(4 << 20); err != nil {
-			http.Error(w, "file_too_large_or_missing", http.StatusRequestEntityTooLarge)
+			writeError(w, http.StatusRequestEntityTooLarge, "file_too_large_or_missing")
 			return
 		}
 		f, _, err := r.FormFile("file")
 		if err != nil {
-			http.Error(w, "missing_file", http.StatusBadRequest)
+			writeError(w, http.StatusBadRequest, "missing_file")
 			return
 		}
 		defer f.Close()
@@ -54,17 +54,17 @@ func myAvatarHandler(db *sql.DB) http.HandlerFunc {
 		n, _ := f.Read(head)
 		ctype := http.DetectContentType(head[:n])
 		if ctype != "image/jpeg" {
-			http.Error(w, "only_jpeg_allowed", http.StatusBadRequest)
+			writeError(w, http.StatusBadRequest, "only_jpeg_allowed")
 			return
 		}
 		if _, err := f.Seek(0, io.SeekStart); err != nil {
-			http.Error(w, "seek_failed", http.StatusInternalServerError)
+			writeError(w, http.StatusInternalServerError, "seek_failed")
 			return
 		}
 
 		// Make sure the directory exists
 		if err := os.MkdirAll(avatarRoot, 0o755); err != nil {
-			http.Error(w, "mkdir_failed", http.StatusInternalServerError)
+			writeError(w, http.StatusInternalServerError, "mkdir_failed")
 			return
 		}
 
@@ -75,17 +75,17 @@ func myAvatarHandler(db *sql.DB) http.HandlerFunc {
 
 		out, err := os.Create(tmp)
 		if err != nil {
-			http.Error(w, "save_failed", http.StatusInternalServerError)
+			writeError(w, http.StatusInternalServerError, "save_failed")
 			return
 		}
 		if _, err := io.Copy(out, f); err != nil {
 			out.Close()
-			http.Error(w, "save_failed", http.StatusInternalServerError)
+			writeError(w, http.StatusInternalServerError, "save_failed")
 			return
 		}
 		out.Close()
 		if err := os.Rename(tmp, dst); err != nil {
-			http.Error(w, "save_failed", http.StatusInternalServerError)
+			writeError(w, http.StatusInternalServerError, "save_failed")
 			return
 		}
 
@@ -96,7 +96,7 @@ func myAvatarHandler(db *sql.DB) http.HandlerFunc {
 		`, filename, me)
 		if err != nil {
 			// If the database fails, leave the file but report the error.
-			http.Error(w, "db_update_failed", http.StatusInternalServerError)
+			writeError(w, http.StatusInternalServerError, "db_update_failed")
 			return
 		}
 		aff, _ := res.RowsAffected()
@@ -104,7 +104,7 @@ func myAvatarHandler(db *sql.DB) http.HandlerFunc {
 			// The profile row has not been initialized yet.
 			// Remove the file
 			_ = os.Remove(dst)
-			http.Error(w, "profile_not_initialized", http.StatusConflict)
+			writeError(w, http.StatusConflict, "profile_not_initialized")
 			return
 		}
 
@@ -120,7 +120,7 @@ func getUserAvatarHandler(db *sql.DB) http.HandlerFunc {
 
 	return authenticate(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {
-			http.Error(w, "method_not_allowed", http.StatusMethodNotAllowed)
+			writeError(w, http.StatusMethodNotAllowed, "method_not_allowed")
 
 			return
 		}
@@ -142,7 +142,7 @@ func getUserAvatarHandler(db *sql.DB) http.HandlerFunc {
 
 		// Own picture ok. Otherwise a pending/accepted/recommended relationship must exist.
 		if me != targetID {
-			ok, _ := hasPendingOrAccepted(db, me, targetID)
+			ok := canViewUser(r.Context(), db, me, targetID)
 
 			// Check if the requested user is recommendable and if so, allow viewing
 			if !ok {
