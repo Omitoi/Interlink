@@ -44,7 +44,7 @@ err = withTx(r.Context(), db, func(tx *sql.Tx) error {
 ### 2. O(n) Semantic Matching Algorithm
 The recommendation engine uses a sophisticated weighted scoring system that matches users based on 6 dimensions (including "Analog Passions" vs "Digital Delights"). It performs semantic groupings (e.g., "Piano" matches "Music") without external ML dependencies.
 
-**Key File**: [`backend/helper.go`](backend/helper.go)
+**Key File**: [`backend/recommendation_service.go`](backend/recommendation_service.go)
 - See `calculateInterestScore` for the O(n) semantic matching logic.
 
 ---
@@ -68,15 +68,28 @@ The recommendation engine uses a sophisticated weighted scoring system that matc
 ## 📁 Project Structure
 
 ```text
-match-me/
-├── backend/            # Go Standard Lib API
-│   ├── connections.go  # Core social graph logic (The "Proud" Code)
-│   ├── helper.go       # Matching algorithm
-│   └── cmd/            # Entry points
-├── frontend/           # React/Vite TypeScript App
-├── db-seeder/          # Go tool to generate 10k+ fake users
-├── docker-compose.yml  # Production orchestration
-└── Makefile            # Developer convenience scripts
+Interlink/
+├── backend/              # Go Standard Lib API (package main)
+│   ├── main.go           # Server bootstrap & route registration
+│   ├── connections.go    # Social graph HTTP handlers
+│   ├── connection_service.go     # Connection business logic & state machine
+│   ├── connection_repository.go  # Connection SQL queries
+│   ├── chat.go           # WebSocket hub & chat HTTP handlers
+│   ├── chat_service.go   # Chat business logic
+│   ├── chat_repository.go        # Chat SQL queries
+│   ├── recommendations.go        # Recommendation HTTP handlers
+│   ├── recommendation_service.go # Matching algorithm & scoring
+│   ├── recommendation_repository.go # Recommendation SQL queries
+│   ├── auth.go           # Auth HTTP handlers & JWT middleware
+│   ├── auth_service.go   # bcrypt & token logic
+│   ├── auth_repository.go        # User SQL queries
+│   ├── users_profiles.go         # User/profile HTTP handlers
+│   ├── users_profiles_service.go # Profile orchestration & permissions
+│   └── users_profiles_repository.go # Profile SQL queries
+├── frontend/             # React/Vite TypeScript App
+├── db-seeder/            # Go tool to generate fake users
+├── docker-compose.yml    # Production orchestration
+└── Makefile              # Developer convenience scripts
 ```
 
 ---

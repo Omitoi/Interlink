@@ -1,54 +1,68 @@
 package main
 
 import (
-	"context"
 	"database/sql"
+	"errors"
 	"net/http"
 	"strconv"
 	"strings"
 )
 
 func recommendationsHandler(db *sql.DB) http.HandlerFunc {
+	repo := NewRecommendationRepository(db)
+	svc := NewRecommendationService(repo)
 	return authenticate(func(w http.ResponseWriter, r *http.Request) {
 		userID := r.Context().Value(userIDKey).(int)
-		// Gate by profile completion
-		var isComplete bool
-		err := db.QueryRow("SELECT COALESCE(is_complete, FALSE) FROM profiles WHERE user_id = $1", userID).Scan(&isComplete)
-		if err == sql.ErrNoRows || !isComplete {
-			writeError(w, http.StatusForbidden, "incomplete_profile")
-			return
-		} else if err != nil {
+
+		isComplete, err := svc.CheckProfileComplete(r.Context(), userID)
+		if err != nil {
 			writeError(w, http.StatusInternalServerError, "db_error")
 			return
 		}
-		recommendations, err := getRecommendedUserIDs(r.Context(), db, userID)
+		if !isComplete {
+			writeError(w, http.StatusForbidden, "incomplete_profile")
+			return
+		}
+
+		recommendations, err := svc.GetRecommendedUserIDs(r.Context(), userID)
 		if err != nil {
 			writeError(w, http.StatusInternalServerError, "recommendation_error")
 			return
 		}
+		
+		if recommendations == nil {
+			recommendations = []int{}
+		}
+
 		writeJSON(w, http.StatusOK, map[string][]int{"recommendations": recommendations})
 	})
 }
 
 // GET /recommendations/detailed - Returns recommendations with scores
 func recommendationsDetailedHandler(db *sql.DB) http.HandlerFunc {
+	repo := NewRecommendationRepository(db)
+	svc := NewRecommendationService(repo)
 	return authenticate(func(w http.ResponseWriter, r *http.Request) {
 		userID := r.Context().Value(userIDKey).(int)
-		// Gate by profile completion
-		var isComplete bool
-		err := db.QueryRow("SELECT COALESCE(is_complete, FALSE) FROM profiles WHERE user_id = $1", userID).Scan(&isComplete)
-		if err == sql.ErrNoRows || !isComplete {
-			writeError(w, http.StatusForbidden, "incomplete_profile")
-			return
-		} else if err != nil {
+		
+		isComplete, err := svc.CheckProfileComplete(r.Context(), userID)
+		if err != nil {
 			writeError(w, http.StatusInternalServerError, "db_error")
 			return
 		}
+		if !isComplete {
+			writeError(w, http.StatusForbidden, "incomplete_profile")
+			return
+		}
 
-		results, err := getRecommendationsWithScores(r.Context(), db, userID)
+		results, err := svc.GetRecommendationsWithScores(r.Context(), userID)
 		if err != nil {
 			writeError(w, http.StatusInternalServerError, "recommendation_error")
 			return
+		}
+
+		if results == nil {
+			results = []RecommendationResult{}
 		}
 
 		writeJSON(w, http.StatusOK, map[string][]RecommendationResult{"recommendations": results})
@@ -57,6 +71,8 @@ func recommendationsDetailedHandler(db *sql.DB) http.HandlerFunc {
 
 // POST /recommendations/{id}/dismiss
 func dismissRecommendationHandler(db *sql.DB) http.HandlerFunc {
+	repo := NewRecommendationRepository(db)
+	svc := NewRecommendationService(repo)
 	return authenticate(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
 			writeError(w, http.StatusMethodNotAllowed, "invalid_method")
@@ -73,37 +89,19 @@ func dismissRecommendationHandler(db *sql.DB) http.HandlerFunc {
 			writeError(w, http.StatusNotFound, "not_found")
 			return
 		}
+		
 		userID := r.Context().Value(userIDKey).(int)
-		// Ensure target user exists & is currently recommended (optional stronger check)
-		var exists bool
-		err = db.QueryRow("SELECT EXISTS (SELECT 1 FROM users JOIN profiles ON users.id = profiles.user_id WHERE users.id = $1 AND profiles.is_complete = TRUE)", id).Scan(&exists)
-		if err != nil || !exists || id == userID {
-			writeError(w, http.StatusNotFound, "not_found")
-			return
-		}
-		// Insert dismissal (ignore duplicates)
-		_, err = db.Exec(`INSERT INTO dismissed_recommendations (user_id, dismissed_user_id) VALUES ($1,$2) ON CONFLICT DO NOTHING`, userID, id)
+		
+		err = svc.DismissRecommendation(r.Context(), userID, id)
 		if err != nil {
+			if errors.Is(err, ErrNotFound) {
+				writeError(w, http.StatusNotFound, "not_found")
+				return
+			}
 			writeError(w, http.StatusInternalServerError, "dismiss_error")
 			return
 		}
+		
 		writeJSON(w, http.StatusCreated, map[string]bool{"dismissed": true})
 	})
-}
-
-// isCurrentlyRecommendable returns true if targetID is in the *current*
-// recommendations for `me`, after subtracting any users the caller has dismissed.
-// This mirrors the /recommendations filtering so the policy is consistent.
-func isCurrentlyRecommendable(ctx context.Context, db *sql.DB, me, targetID int) (bool, error) {
-	recs, err := getRecommendedUserIDs(ctx, db, me)
-	if err != nil {
-		return false, err
-	}
-	// Build a set for O(1) membership checks
-	recSet := make(map[int]struct{}, len(recs))
-	for _, id := range recs {
-		recSet[id] = struct{}{}
-	}
-	_, ok := recSet[targetID]
-	return ok, nil
 }

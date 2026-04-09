@@ -18,7 +18,7 @@ import (
 
 // ChatMessage represents a chat message with metadata
 type ChatMessage struct {
-	ID     int64     `json:"id"`   // DB message id
+	ID     int64     `json:"id"`
 	Type   string    `json:"type"` // "message"
 	ChatID int       `json:"chat_id"`
 	From   int       `json:"from"`
@@ -36,12 +36,11 @@ type ServerEvent struct {
 
 // Client represents a WebSocket client connection
 type Client struct {
-	userID int
-	conn   *websocket.Conn
-	send   chan ServerEvent
-	db     *sql.DB
+	userID  int
+	conn    *websocket.Conn
+	send    chan ServerEvent
+	chatSvc ChatService
 }
-
 
 // Hub manages WebSocket client connections
 type Hub struct {
@@ -100,6 +99,9 @@ var upgrader = websocket.Upgrader{
 var chatHub = newHub()
 
 func wsChatHandler(db *sql.DB) http.HandlerFunc {
+	repo := NewChatRepository(db)
+	svc := NewChatService(repo, db)
+
 	// WebSocket upgrade hijacks the response, so we cannot use the authenticate() wrapper.
 	// Auth is handled inline via getUserIDFromRequest.
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -116,10 +118,10 @@ func wsChatHandler(db *sql.DB) http.HandlerFunc {
 		}
 
 		client := &Client{
-			userID: userID,
-			conn:   conn,
-			send:   make(chan ServerEvent, 16),
-			db:     db,
+			userID:  userID,
+			conn:    conn,
+			send:    make(chan ServerEvent, 16),
+			chatSvc: svc,
 		}
 		chatHub.register(client)
 
@@ -134,7 +136,6 @@ func wsChatHandler(db *sql.DB) http.HandlerFunc {
 }
 
 // Extract user ID from Authorization header using the existing jwtSecret
-// This mirrors the authenticate() logic, but returns (id,ok) instead of wrapping a handler.
 func getUserIDFromBearer(r *http.Request) (int, bool) {
 	auth := r.Header.Get("Authorization")
 	if len(auth) < 8 || auth[:7] != "Bearer " {
@@ -145,7 +146,6 @@ func getUserIDFromBearer(r *http.Request) (int, bool) {
 	return id, ok
 }
 
-// replace getUserIDFromBearer with:
 func getUserIDFromRequest(r *http.Request) (int, bool) {
 	// Try Authorization header first
 	if id, ok := getUserIDFromBearer(r); ok {
@@ -172,7 +172,6 @@ func parseUserIDFromJWT(tokenStr string) (int, bool) {
 		return 0, false
 	}
 
-	// jwt.MapClaims stores numbers as float64 by default
 	fv, ok := claims["user_id"].(float64)
 	if !ok {
 		return 0, false
@@ -185,7 +184,7 @@ func jwtParse(s string) (*jwt.Token, error) {
 	return jwt.Parse(s, func(token *jwt.Token) (any, error) { return jwtSecret, nil })
 }
 
-// Client reader
+// clientReader handles incoming WebSocket messages from a connected client.
 func clientReader(c *Client) {
 	defer func() {
 		chatHub.unregister(c)
@@ -213,23 +212,12 @@ func clientReader(c *Client) {
 
 		switch msg.Type {
 		case "message":
-			// 1) Save to database
-			id, chatID, ts, err := saveChatMsg(context.Background(), c.db, c.userID, msg.To, msg.Body)
+			outMsg, err := c.chatSvc.SendMessage(context.Background(), c.userID, msg.To, msg.Body)
 			if err != nil {
 				c.send <- ServerEvent{Type: "error", Data: "cannot send message"}
 				continue
 			}
 
-			outMsg := ChatMessage{
-				ID:     id,
-				Type:   "message",
-				ChatID: chatID,
-				From:   c.userID,
-				To:     msg.To,
-				Body:   msg.Body,
-				Ts:     ts,
-			}
-			// minimal relay: send to recipient and echo back to sender
 			out := ServerEvent{
 				Type: "message",
 				From: c.userID,
@@ -239,11 +227,10 @@ func clientReader(c *Client) {
 			log.Printf("[CHAT DEBUG] Sending message to recipient %d", msg.To)
 			chatHub.sendToUser(msg.To, out)
 			log.Printf("[CHAT DEBUG] Echoing message back to sender %d", c.userID)
-			chatHub.sendToUser(c.userID, out) // echo (so sender UI updates instantly)
+			chatHub.sendToUser(c.userID, out) // echo so sender UI updates instantly
 
 		case "typing":
 			log.Printf("[CHAT DEBUG] Processing typing indicator from %d to %d", c.userID, msg.To)
-			// notify recipient that sender is typing
 			chatHub.sendToUser(msg.To, ServerEvent{Type: "typing", From: c.userID})
 
 		default:
@@ -253,7 +240,7 @@ func clientReader(c *Client) {
 	}
 }
 
-// Client writer
+// clientWriter pumps outgoing events to the WebSocket connection.
 func clientWriter(c *Client) {
 	ticker := time.NewTicker(30 * time.Second)
 	defer func() {
@@ -281,163 +268,11 @@ func clientWriter(c *Client) {
 	}
 }
 
-// Helper function for saving the message history to database
-func saveChatMsg(ctx context.Context, db *sql.DB, fromUserID int, toUserID int, content string) (int64, int, time.Time, error) {
-	tx, err := db.BeginTx(ctx, nil)
-	if err != nil {
-		return 0, 0, time.Time{}, err
-	}
-	defer func() {
-		if err != nil {
-			_ = tx.Rollback()
-		} else {
-			_ = tx.Commit()
-		}
-	}()
-
-	// 1) Make sure that the connection status is 'accepted'
-	var ok int
-	err = tx.QueryRowContext(ctx, `
-		SELECT 1
-		FROM connections
-		WHERE status = 'accepted'
-			AND ((user_id = $1 AND target_user_id = $2) OR(user_id = $2 AND target_user_id = $1))
-		LIMIT 1
-	`, fromUserID, toUserID).Scan(&ok)
-	if err != nil {
-		if err == sql.ErrNoRows {
-			return 0, 0, time.Time{}, fmt.Errorf("no accepted connection")
-		}
-		return 0, 0, time.Time{}, err
-	}
-
-	// 2) Fetch or create a chat id
-	var chatID int
-	err = tx.QueryRowContext(ctx, `
-		SELECT id
-		FROM chats
-		WHERE user1_id = LEAST($1::int, $2::int) AND user2_id = GREATEST($1::int, $2::int)
-		LIMIT 1
-	`, fromUserID, toUserID).Scan(&chatID)
-	if err == sql.ErrNoRows {
-		// Create
-		err = tx.QueryRowContext(ctx, `
-			INSERT INTO chats (user1_id, user2_id)
-			VALUES (LEAST($1::int, $2::int), GREATEST($1::int, $2::int))
-			ON CONFLICT (user1_id, user2_id) DO NOTHING
-			RETURNING id
-		`, fromUserID, toUserID).Scan(&chatID)
-		if err == sql.ErrNoRows {
-			// Race: someone else created first -> refetch
-			err = tx.QueryRowContext(ctx, `
-				SELECT id
-				FROM chats
-				WHERE user1_id = LEAST($1::int, $2::int) AND user2_id = GREATEST($1::int, $2::int)
-				LIMIT 1
-			`, fromUserID, toUserID).Scan(&chatID)
-		}
-	}
-	if err != nil {
-		return 0, 0, time.Time{}, err
-	}
-
-	// 3) Add message
-	var msgID int64
-	var createdAt time.Time
-	err = tx.QueryRowContext(ctx, `
-		INSERT INTO messages (chat_id, sender_id, content)
-		VALUES ($1, $2, $3)
-		RETURNING id, created_at
-	`, chatID, fromUserID, content).Scan(&msgID, &createdAt)
-	if err != nil {
-		return 0, 0, time.Time{}, err
-	}
-
-	// 4) Update last_message_at and unread to the peer
-	_, err = tx.ExecContext(ctx, `
-		UPDATE chats c
-		SET last_message_at = $3,
-			unread_for_user1 = CASE WHEN $2 = c.user2_id THEN TRUE ELSE unread_for_user1 END,
-			unread_for_user2 = CASE WHEN $2 = c.user1_id THEN TRUE ELSE unread_for_user2 END
-		WHERE c.id = $1
-	`, chatID, fromUserID, createdAt)
-	if err != nil {
-		return 0, 0, time.Time{}, err
-	}
-
-	return msgID, chatID, createdAt, nil
-}
-
-func getChatMessages(ctx context.Context, db *sql.DB, userID int, otherUserID int, limit int, before *time.Time) ([]ChatMessage, error) {
-	// 1) Resolve chat id
-	var chatID int
-	err := db.QueryRowContext(ctx, `
-		SELECT id
-		FROM chats
-		WHERE user1_id = LEAST($1::int, $2::int) AND user2_id = GREATEST($1::int, $2::int)
-		LIMIT 1
-	`, userID, otherUserID).Scan(&chatID)
-	if err != nil {
-		if err == sql.ErrNoRows {
-			return []ChatMessage{}, nil
-		}
-		return nil, err
-	}
-
-	// 2) Fetch messages
-	q := `
-		SELECT id, sender_id, content, created_at
-		FROM messages
-		WHERE chat_id = $1
-			AND ($2::timestamptz IS NULL OR created_at < $2)
-			ORDER BY created_at DESC
-		LIMIT $3`
-
-	var rows *sql.Rows
-	if before != nil {
-		rows, err = db.QueryContext(ctx, q, chatID, *before, limit)
-	} else {
-		rows, err = db.QueryContext(ctx, q, chatID, nil, limit)
-	}
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	msgs := make([]ChatMessage, 0, limit)
-	for rows.Next() {
-		var msgID int64
-		var senderID int
-		var body string
-		var createdAt time.Time
-		if err := rows.Scan(&msgID, &senderID, &body, &createdAt); err != nil {
-			return nil, err
-		}
-
-		msgs = append(msgs, ChatMessage{
-			ID:     msgID,
-			Type:   "message",
-			ChatID: chatID,
-			From:   senderID,
-			Body:   body,
-			Ts:     createdAt,
-		})
-	}
-
-	// Check for errors after the last iteration
-	if err := rows.Err(); err != nil {
-		// Don't mark as read if the query failed
-		return nil, err
-	}
-
-	// 3) Set all messages from the other user as read and clear unread flag for this user
-	markChatAsRead(db, chatID, userID, otherUserID)
-
-	return msgs, nil
-}
-
 // GET /chats/{otherUserId}/messages?limit=50&before=2025-09-16T08:00:00Z
 func getChatHistoryHandler(db *sql.DB) http.HandlerFunc {
+	repo := NewChatRepository(db)
+	svc := NewChatService(repo, db)
+
 	return authenticate(func(w http.ResponseWriter, r *http.Request) {
 		userID := r.Context().Value(userIDKey).(int)
 
@@ -452,7 +287,6 @@ func getChatHistoryHandler(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		// query params
 		limit := 50
 		if v := r.URL.Query().Get("limit"); v != "" {
 			if n, err := strconv.Atoi(v); err == nil && n > 0 && n <= 200 {
@@ -466,7 +300,7 @@ func getChatHistoryHandler(db *sql.DB) http.HandlerFunc {
 			}
 		}
 
-		msgs, err := getChatMessages(r.Context(), db, userID, otherID, limit, beforePtr)
+		msgs, err := svc.GetHistory(r.Context(), userID, otherID, limit, beforePtr)
 		if err != nil {
 			writeError(w, http.StatusInternalServerError, "failed_to_fetch_messages")
 			return
@@ -477,18 +311,24 @@ func getChatHistoryHandler(db *sql.DB) http.HandlerFunc {
 	})
 }
 
-func markChatAsRead(db *sql.DB, chatID, readerUserID, senderUserID int) error {
-	_, _ = db.Exec(`
-    UPDATE messages
-    SET is_read = TRUE
-    WHERE chat_id = $1 AND sender_id = $2 AND is_read IS FALSE
-`, chatID, senderUserID)
+// Backward-compatibility wrappers called by tests that import these directly.
+func saveChatMsg(ctx context.Context, db *sql.DB, fromUserID, toUserID int, content string) (int64, int, time.Time, error) {
+	return NewChatRepository(db).SaveChatMsg(ctx, fromUserID, toUserID, content)
+}
 
-	_, _ = db.Exec(`
-    UPDATE chats c
-    SET unread_for_user1 = CASE WHEN $1 = c.user1_id THEN FALSE ELSE unread_for_user1 END,
-        unread_for_user2 = CASE WHEN $1 = c.user2_id THEN FALSE ELSE unread_for_user2 END
-    WHERE c.id = $2
-`, readerUserID, chatID)
-	return nil
+func getChatMessages(ctx context.Context, db *sql.DB, userID, otherUserID, limit int, before *time.Time) ([]ChatMessage, error) {
+	repo := NewChatRepository(db)
+	msgs, err := repo.GetChatMessages(ctx, userID, otherUserID, limit, before)
+	if err != nil {
+		return nil, err
+	}
+	chatID, err := repo.GetChatIDForPair(ctx, userID, otherUserID)
+	if err == nil {
+		_ = repo.MarkChatAsRead(chatID, userID, otherUserID)
+	}
+	return msgs, nil
+}
+
+func markChatAsRead(db *sql.DB, chatID, readerUserID, senderUserID int) error {
+	return NewChatRepository(db).MarkChatAsRead(chatID, readerUserID, senderUserID)
 }

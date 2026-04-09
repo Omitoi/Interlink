@@ -54,25 +54,26 @@ See ../docs/API_SPEC.md for full endpoint specification.
 
 ## Database Schema
 
-- **users:** `id`, `email`, `password_hash`
-- **profiles:** `user_id`, profile fields, `match_preferences` (JSON)
-- **connections:** `id`, `user_id`, `target_user_id`, `status` (enum: pending, accepted, dismissed, disconnected), timestamps
+| Table | Key columns |
+|---|---|
+| `users` | `id`, `email`, `password_hash`, `last_online` |
+| `profiles` | `user_id`, display/bio fields, `match_preferences` (JSON), `is_complete` |
+| `connections` | `id`, `user_id`, `target_user_id`, `status` (pending/accepted/disconnected), timestamps |
+| `chats` | `id`, `user1_id`, `user2_id`, `last_message_at`, unread flags |
+| `messages` | `id`, `chat_id`, `sender_id`, `content`, `is_read`, `created_at` |
+| `dismissed_recommendations` | `user_id`, `dismissed_user_id` |
 
 ---
 
 ## Running Tests
 
 ```bash
-go test
+cd backend
+go test ./...
 ```
 
-- Tests cover registration, login, profile completion, recommendations, and connections.
-
----
-
-## Project Requirements
-
-- See [copilot-instructions.md](.github/copilot-instructions.md) for full requirements and coding standards.
+- Tests cover registration, login, profile completion, recommendations, connections, chat, and avatars.
+- Integration tests require the Dockerised PostgreSQL instance (`docker compose up -d`).
 
 ---
 
@@ -86,13 +87,24 @@ go test
 
 ---
 
-## Next Steps
+## Architecture
 
-- Implement endpoints for connection requests (send, accept, dismiss).
-- Add chat functionality for connected users.
-- Expand RESTful endpoints for `/users/{id}`, `/users/{id}/profile`, `/users/{id}/bio`, `/me`, etc.
-- Add more automated and integration tests.
-- Ensure accessibility and performance standards are met.
+The backend follows a **3-Tier Layered Architecture** across all domains:
+
+```
+HTTP / WebSocket
+      │
+  Handlers  ──────────▶  Service  ──────────▶  Repository
+(parse, route)       (business rules)          (raw SQL)
+```
+
+Each domain (auth, connections, chat, recommendations, users/profiles) has three files:
+
+| File pattern | Responsibility |
+|---|---|
+| `<domain>.go` | Parses HTTP/WS requests, calls service, writes response |
+| `<domain>_service.go` | Business logic, permission checks, orchestration |
+| `<domain>_repository.go` | All SQL queries and database access |
 
 ---
 

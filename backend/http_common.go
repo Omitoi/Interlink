@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
-	"strings"
 	"time"
 )
 
@@ -44,32 +43,7 @@ func jsonRawOrArray(raw json.RawMessage) interface{} {
 	return v
 }
 
-func fetchBasicUserInfo(ctx context.Context, db *sql.DB, userID int) (displayName, profilePicture string, err error) {
-	err = db.QueryRowContext(ctx, `
-        SELECT
-            COALESCE(p.display_name, 'User ' || u.id::text) AS display_name,
-            COALESCE(p.profile_picture_file, 'avatar_placeholder.png') AS profile_picture_file
-        FROM users u
-        LEFT JOIN profiles p ON p.user_id = u.id
-        WHERE u.id = $1
-    `, userID).Scan(&displayName, &profilePicture)
-	return
-}
-
-func fetchProfileInfo(ctx context.Context, db *sql.DB, userID int) (aboutMe, displayName, profilePicture string, err error) {
-	var profilePictureSQL sql.NullString
-	err = db.QueryRowContext(ctx,
-		"SELECT about_me, display_name, profile_picture_file FROM profiles WHERE user_id = $1",
-		userID,
-	).Scan(&aboutMe, &displayName, &profilePictureSQL)
-
-	if profilePictureSQL.Valid && strings.TrimSpace(profilePictureSQL.String) != "" {
-		profilePicture = profilePictureSQL.String
-	} else {
-		profilePicture = "avatar_placeholder.png"
-	}
-	return
-}
+// Removed fetchBasicUserInfo and fetchProfileInfo - now migrated to users_profiles_repository.go
 
 // withTx wraps a function in a database transaction.
 // - Ensures COMMIT on success, ROLLBACK on errors or panics.
