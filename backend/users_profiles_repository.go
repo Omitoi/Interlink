@@ -46,9 +46,9 @@ type UserProfileRepository interface {
 	GetBasicUserInfo(ctx context.Context, userID int) (string, string, error)
 	GetProfileInfo(ctx context.Context, userID int) (string, string, string, error)
 	GetProfileLocation(ctx context.Context, userID int) (sql.NullFloat64, sql.NullFloat64, error)
-	GetProfileBio(ctx context.Context, userID int) (json.RawMessage, json.RawMessage, json.RawMessage, json.RawMessage, json.RawMessage, error)
+	GetProfileBio(ctx context.Context, userID int) (json.RawMessage, json.RawMessage, string, string, string, error)
 	GetFullProfile(ctx context.Context, userID int) (UserProfileData, error)
-	GetMeBio(ctx context.Context, userID int) (json.RawMessage, json.RawMessage, json.RawMessage, json.RawMessage, error)
+	GetMeBio(ctx context.Context, userID int) (json.RawMessage, json.RawMessage, string, string, error)
 	UpsertProfile(ctx context.Context, userID int, req ProfileRequest) error
 	CanViewUser(ctx context.Context, viewerID, targetID int) bool
 }
@@ -99,10 +99,11 @@ func (r *sqlUserProfileRepo) GetProfileLocation(ctx context.Context, userID int)
 	return lat, lon, err
 }
 
-func (r *sqlUserProfileRepo) GetProfileBio(ctx context.Context, userID int) (json.RawMessage, json.RawMessage, json.RawMessage, json.RawMessage, json.RawMessage, error) {
-	var analog, digital, collaborationInterests, favoriteFood, favoriteMusic json.RawMessage
-	err := r.db.QueryRowContext(ctx, `SELECT analog_passions, digital_delights, to_jsonb(collaboration_interests), to_jsonb(favorite_food), to_jsonb(favorite_music) FROM profiles WHERE user_id = $1`, userID).Scan(&analog, &digital, &collaborationInterests, &favoriteFood, &favoriteMusic)
-	return analog, digital, collaborationInterests, favoriteFood, favoriteMusic, err
+func (r *sqlUserProfileRepo) GetProfileBio(ctx context.Context, userID int) (json.RawMessage, json.RawMessage, string, string, string, error) {
+	var analog, digital json.RawMessage
+	var collaborationInterests, favoriteFood, favoriteMusic sql.NullString
+	err := r.db.QueryRowContext(ctx, `SELECT analog_passions, digital_delights, collaboration_interests, favorite_food, favorite_music FROM profiles WHERE user_id = $1`, userID).Scan(&analog, &digital, &collaborationInterests, &favoriteFood, &favoriteMusic)
+	return analog, digital, collaborationInterests.String, favoriteFood.String, favoriteMusic.String, err
 }
 
 func (r *sqlUserProfileRepo) GetFullProfile(ctx context.Context, userID int) (UserProfileData, error) {
@@ -120,10 +121,11 @@ func (r *sqlUserProfileRepo) GetFullProfile(ctx context.Context, userID int) (Us
 	return data, err
 }
 
-func (r *sqlUserProfileRepo) GetMeBio(ctx context.Context, userID int) (json.RawMessage, json.RawMessage, json.RawMessage, json.RawMessage, error) {
-	var analog, digital, seeking, interests json.RawMessage
-	err := r.db.QueryRowContext(ctx, `SELECT analog_passions, digital_delights, to_jsonb(collaboration_interests), to_jsonb(favorite_music) FROM profiles WHERE user_id = $1`, userID).Scan(&analog, &digital, &seeking, &interests)
-	return analog, digital, seeking, interests, err
+func (r *sqlUserProfileRepo) GetMeBio(ctx context.Context, userID int) (json.RawMessage, json.RawMessage, string, string, error) {
+	var analog, digital json.RawMessage
+	var seeking, interests sql.NullString
+	err := r.db.QueryRowContext(ctx, `SELECT analog_passions, digital_delights, collaboration_interests, favorite_music FROM profiles WHERE user_id = $1`, userID).Scan(&analog, &digital, &seeking, &interests)
+	return analog, digital, seeking.String, interests.String, err
 }
 
 func (r *sqlUserProfileRepo) UpsertProfile(ctx context.Context, userID int, req ProfileRequest) error {

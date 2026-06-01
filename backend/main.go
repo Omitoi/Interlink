@@ -75,6 +75,17 @@ func main() {
 	// GraphQL endpoint with middleware chain (DataLoader + Auth)
 	// Set JWT secret for GraphQL resolvers
 	graph.SetJWTSecret(jwtSecret)
+
+	// Inject services to GraphQL resolvers
+	authRepo := NewAuthRepository(db)
+	graph.AuthSvc = NewAuthService(authRepo)
+
+	connRepo := NewConnectionRepository()
+	graph.ConnectionsSvc = NewConnectionService(db, connRepo)
+
+	recRepo := NewRecommendationRepository(db)
+	graph.RecommendationSvc = NewRecommendationService(recRepo)
+
 	srv := handler.NewDefaultServer(graph.NewExecutableSchema(graph.Config{Resolvers: graph.NewResolver(db)}))
 
 	// Create middleware chain: DataLoader -> Auth -> GraphQL

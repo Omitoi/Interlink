@@ -150,9 +150,9 @@ func (s *userProfileService) GetTargetBio(ctx context.Context, requesterID, targ
 		"id":                      targetID,
 		"analog_passions":         jsonRawOrArray(analog),
 		"digital_delights":        jsonRawOrArray(digital),
-		"collaboration_interests": jsonRawOrArray(collaborationInterests),
-		"favorite_food":           jsonRawOrArray(favoriteFood),
-		"favorite_music":          jsonRawOrArray(favoriteMusic),
+		"collaboration_interests": collaborationInterests,
+		"favorite_food":           favoriteFood,
+		"favorite_music":          favoriteMusic,
 	}, nil
 }
 
@@ -169,8 +169,8 @@ func (s *userProfileService) GetMeBio(ctx context.Context, userID int) (map[stri
 		"id":               userID,
 		"analog_passions":  jsonRawOrArray(analog),
 		"digital_delights": jsonRawOrArray(digital),
-		"seeking":          jsonRawOrArray(seeking),
-		"interests":        jsonRawOrArray(interests),
+		"seeking":          seeking,
+		"interests":        interests,
 	}, nil
 }
 

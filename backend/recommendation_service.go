@@ -89,7 +89,29 @@ func (s *recommendationService) GetRecommendationsWithScores(ctx context.Context
 	json.Unmarshal(digitalDelights, &userProfile.DigitalDelights)
 	json.Unmarshal(matchPrefsRaw, &userProfile.MatchPreferences)
 
-	rows, err := s.repo.GetCandidateProfiles(ctx, userID)
+	var minLat, maxLat, minLon, maxLon *float64
+	if userProfile.MaxRadiusKm > 0 {
+		deltaLat := float64(userProfile.MaxRadiusKm) / 111.32
+		cosLat := math.Cos(userProfile.LocationLat * math.Pi / 180.0)
+		var deltaLon float64
+		if cosLat > 0.001 {
+			deltaLon = float64(userProfile.MaxRadiusKm) / (111.32 * cosLat)
+		} else {
+			deltaLon = 360.0
+		}
+
+		minL := userProfile.LocationLat - deltaLat
+		maxL := userProfile.LocationLat + deltaLat
+		minLo := userProfile.LocationLon - deltaLon
+		maxLo := userProfile.LocationLon + deltaLon
+
+		minLat = &minL
+		maxLat = &maxL
+		minLon = &minLo
+		maxLon = &maxLo
+	}
+
+	rows, err := s.repo.GetCandidateProfiles(ctx, userID, minLat, maxLat, minLon, maxLon)
 	if err != nil {
 		return nil, err
 	}

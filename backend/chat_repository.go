@@ -171,19 +171,22 @@ func (r *sqlChatRepo) GetChatMessages(ctx context.Context, userID, otherUserID, 
 }
 
 func (r *sqlChatRepo) MarkChatAsRead(chatID, readerUserID, senderUserID int) error {
-	_, _ = r.db.Exec(`
+	_, err := r.db.Exec(`
 		UPDATE messages
 		SET is_read = TRUE
 		WHERE chat_id = $1 AND sender_id = $2 AND is_read IS FALSE
 	`, chatID, senderUserID)
+	if err != nil {
+		return err
+	}
 
-	_, _ = r.db.Exec(`
+	_, err = r.db.Exec(`
 		UPDATE chats c
 		SET unread_for_user1 = CASE WHEN $1 = c.user1_id THEN FALSE ELSE unread_for_user1 END,
 			unread_for_user2 = CASE WHEN $1 = c.user2_id THEN FALSE ELSE unread_for_user2 END
 		WHERE c.id = $2
 	`, readerUserID, chatID)
-	return nil
+	return err
 }
 
 func (r *sqlChatRepo) GetChatSummaries(ctx context.Context, userID int) ([]ChatPeerSummary, error) {

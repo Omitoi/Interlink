@@ -22,6 +22,27 @@ import (
 // External reference to the global jwtSecret from main package
 var jwtSecret []byte
 
+type AuthService interface {
+	Register(ctx context.Context, email, password string) (string, int, error)
+	Login(ctx context.Context, email, password string) (string, int, error)
+}
+
+type ConnectionService interface {
+	RequestConnection(ctx context.Context, me, targetID int) (string, *int, error)
+	AcceptConnection(ctx context.Context, me, targetID int) (string, *int, error)
+	DeclineConnection(ctx context.Context, me, targetID int) (string, error)
+}
+
+type RecommendationService interface {
+	DismissRecommendation(ctx context.Context, userID, dismissedUserID int) error
+}
+
+var (
+	AuthSvc           AuthService
+	ConnectionsSvc    ConnectionService
+	RecommendationSvc RecommendationService
+)
+
 // SetJWTSecret sets the JWT secret for the GraphQL resolvers
 func SetJWTSecret(secret []byte) {
 	jwtSecret = secret
@@ -152,6 +173,27 @@ func (r *bioResolver) User(ctx context.Context, obj *model.Bio) (*model.User, er
 
 // Register is the resolver for the register field.
 func (r *mutationResolver) Register(ctx context.Context, email string, password string) (*model.AuthResult, error) {
+	if AuthSvc != nil {
+		token, newID, err := AuthSvc.Register(ctx, email, password)
+		if err != nil {
+			if err.Error() == "missing_fields" {
+				return nil, fmt.Errorf("email and password are required")
+			}
+			if strings.Contains(err.Error(), "email already exists") || strings.Contains(err.Error(), "duplicate key") || err.Error() == "email_exists" {
+				return nil, fmt.Errorf("email already exists")
+			}
+			return nil, err
+		}
+		user, err := r.getUserByID(newID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to fetch created user: %w", err)
+		}
+		return &model.AuthResult{
+			Token: token,
+			User:  user,
+		}, nil
+	}
+
 	email = strings.TrimSpace(email)
 	password = strings.TrimSpace(password)
 
@@ -206,6 +248,24 @@ func (r *mutationResolver) Register(ctx context.Context, email string, password 
 
 // Login is the resolver for the login field.
 func (r *mutationResolver) Login(ctx context.Context, email string, password string) (*model.AuthResult, error) {
+	if AuthSvc != nil {
+		token, userID, err := AuthSvc.Login(ctx, email, password)
+		if err != nil {
+			if err.Error() == "invalid_credentials" || err.Error() == "invalid_credentials" {
+				return nil, fmt.Errorf("invalid credentials")
+			}
+			return nil, err
+		}
+		user, err := r.getUserByID(userID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to fetch user: %w", err)
+		}
+		return &model.AuthResult{
+			Token: token,
+			User:  user,
+		}, nil
+	}
+
 	email = strings.TrimSpace(email)
 	password = strings.TrimSpace(password)
 
@@ -649,6 +709,33 @@ func (r *mutationResolver) RequestConnection(ctx context.Context, targetUserID s
 		return nil, fmt.Errorf("invalid target user ID: %w", err)
 	}
 
+	if ConnectionsSvc != nil {
+		state, connID, err := ConnectionsSvc.RequestConnection(ctx, currentUserID, targetID)
+		if err != nil {
+			if err.Error() == "not_found" {
+				return nil, fmt.Errorf("target user not found or profile not complete")
+			}
+			return nil, err
+		}
+
+		connection := &model.Connection{
+			ID:           fmt.Sprintf("%d", *connID),
+			UserID:       fmt.Sprintf("%d", currentUserID),
+			TargetUserID: targetUserID,
+			Status:       model.ConnectionStatus(strings.ToUpper(state)),
+			CreatedAt:    time.Now().Format(time.RFC3339),
+			UpdatedAt:    time.Now().Format(time.RFC3339),
+		}
+
+		// Broadcast connection update to subscribers
+		go func() {
+			subscriptionManager := GetSubscriptionManager()
+			subscriptionManager.BroadcastConnectionUpdate(connection)
+		}()
+
+		return connection, nil
+	}
+
 	// Check if target user exists and has complete profile
 	var exists bool
 	err = r.DB.QueryRow(`
@@ -746,6 +833,37 @@ func (r *mutationResolver) RespondToConnection(ctx context.Context, connectionID
 	// Check if current user is the target of this connection request
 	if targetUserID != currentUserID {
 		return nil, fmt.Errorf("unauthorized: you can only respond to requests sent to you")
+	}
+
+	if ConnectionsSvc != nil {
+		var state string
+		var retConnID *int
+		if accept {
+			state, retConnID, err = ConnectionsSvc.AcceptConnection(ctx, currentUserID, userID)
+		} else {
+			state, err = ConnectionsSvc.DeclineConnection(ctx, currentUserID, userID)
+			retConnID = &connID
+		}
+		if err != nil {
+			return nil, err
+		}
+
+		connection := &model.Connection{
+			ID:           fmt.Sprintf("%d", *retConnID),
+			UserID:       fmt.Sprintf("%d", userID),
+			TargetUserID: fmt.Sprintf("%d", targetUserID),
+			Status:       model.ConnectionStatus(strings.ToUpper(state)),
+			CreatedAt:    createdAt.Format(time.RFC3339),
+			UpdatedAt:    time.Now().Format(time.RFC3339),
+		}
+
+		// Broadcast connection update to subscribers
+		go func() {
+			subscriptionManager := GetSubscriptionManager()
+			subscriptionManager.BroadcastConnectionUpdate(connection)
+		}()
+
+		return connection, nil
 	}
 
 	// Check if connection is in pending state
@@ -1030,12 +1148,25 @@ func (r *mutationResolver) DismissRecommendation(ctx context.Context, userID str
 		return false, err
 	}
 
+	targetID, err := strconv.Atoi(userID)
+	if err != nil {
+		return false, fmt.Errorf("invalid user ID: %w", err)
+	}
+
+	if RecommendationSvc != nil {
+		err = RecommendationSvc.DismissRecommendation(ctx, currentUserID, targetID)
+		if err != nil {
+			return false, err
+		}
+		return true, nil
+	}
+
 	// Insert into dismissed_recommendations table
 	_, err = r.DB.Exec(`
-		INSERT INTO dismissed_recommendations (user_id, dismissed_user_id, created_at)
-		VALUES ($1, $2, NOW())
+		INSERT INTO dismissed_recommendations (user_id, dismissed_user_id)
+		VALUES ($1, $2)
 		ON CONFLICT (user_id, dismissed_user_id) DO NOTHING
-	`, currentUserID, userID)
+	`, currentUserID, targetID)
 
 	if err != nil {
 		return false, fmt.Errorf("failed to dismiss recommendation: %w", err)

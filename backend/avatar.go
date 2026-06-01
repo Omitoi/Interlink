@@ -1,6 +1,7 @@
 package main
 
 import (
+	_ "embed"
 	"database/sql"
 	"errors"
 	"fmt"
@@ -12,7 +13,16 @@ import (
 	"strings"
 )
 
+//go:embed avatar-placeholder.png
+var defaultAvatarBytes []byte
+
 const avatarRoot = "./uploads/avatars"
+
+func servePlaceholder(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "image/png")
+	w.Header().Set("Cache-Control", "private, max-age=3600")
+	_, _ = w.Write(defaultAvatarBytes)
+}
 
 // POST /me/avatar  (multipart form, field name: "file")
 // Or redirect to removeAvatar if method is DELETE
@@ -157,35 +167,23 @@ func getUserAvatarHandler(db *sql.DB) http.HandlerFunc {
 
 		// Read the filename from the database
 		filename, err := getProfilePictureFilename(db, targetID)
-		var path string
-		var contentType string
-
-		if err != nil {
-			// No custom profile picture filename in database, use placeholder
-			filename = "avatar_placeholder.png"
-			path = filepath.Join(avatarRoot, filename)
-			contentType = "image/png"
-		} else {
-			// Check if the custom file actually exists
-			path = filepath.Join(avatarRoot, filename)
-			if _, err := os.Stat(path); err != nil {
-				// Custom file doesn't exist, fall back to placeholder
-				filename = "avatar_placeholder.png"
-				path = filepath.Join(avatarRoot, filename)
-				contentType = "image/png"
-			} else {
-				// Determine content type for custom file
-				contentType = "image/jpeg"
-				if strings.HasSuffix(filename, ".png") {
-					contentType = "image/png"
-				}
-			}
+		if err != nil || filename == "" {
+			servePlaceholder(w, r)
+			return
 		}
 
-		// Final check: make sure the file we're about to serve exists
+		// Check if the custom file actually exists
+		path := filepath.Join(avatarRoot, filename)
 		if _, err := os.Stat(path); err != nil {
-			http.NotFound(w, r)
+			// Custom file doesn't exist, fall back to placeholder
+			servePlaceholder(w, r)
 			return
+		}
+
+		// Determine content type for custom file
+		contentType := "image/jpeg"
+		if strings.HasSuffix(strings.ToLower(filename), ".png") {
+			contentType = "image/png"
 		}
 
 		w.Header().Set("Content-Type", contentType)

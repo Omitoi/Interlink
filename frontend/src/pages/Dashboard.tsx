@@ -107,7 +107,7 @@ const Dashboard: React.FC = () => {
 
   const ErrorBanner = error ? (
     <div role="alert" style={{ marginBottom: 12 }}>
-      <strong>Virhe:</strong> {error}
+      <strong>Error:</strong> {error}
     </div>
   ) : null;
 

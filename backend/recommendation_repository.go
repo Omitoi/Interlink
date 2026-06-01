@@ -7,7 +7,7 @@ import (
 
 type RecommendationRepository interface {
 	GetUserProfileData(ctx context.Context, userID int) (Profile, []byte, []byte, []byte, error)
-	GetCandidateProfiles(ctx context.Context, userID int) (*sql.Rows, error)
+	GetCandidateProfiles(ctx context.Context, userID int, minLat, maxLat, minLon, maxLon *float64) (*sql.Rows, error)
 	InsertDismissal(ctx context.Context, userID, dismissedUserID int) error
 	CheckProfileComplete(ctx context.Context, userID int) (bool, error)
 }
@@ -44,8 +44,8 @@ func (r *sqlRecommendationRepo) GetUserProfileData(ctx context.Context, userID i
 	return userProfile, analogPassions, digitalDelights, matchPrefsRaw, err
 }
 
-func (r *sqlRecommendationRepo) GetCandidateProfiles(ctx context.Context, userID int) (*sql.Rows, error) {
-	return r.db.QueryContext(ctx, `
+func (r *sqlRecommendationRepo) GetCandidateProfiles(ctx context.Context, userID int, minLat, maxLat, minLon, maxLon *float64) (*sql.Rows, error) {
+	q := `
         SELECT p.user_id,
                p.analog_passions,
                p.digital_delights,
@@ -67,8 +67,18 @@ func (r *sqlRecommendationRepo) GetCandidateProfiles(ctx context.Context, userID
               SELECT 1
               FROM dismissed_recommendations d
               WHERE d.user_id = $1 AND d.dismissed_user_id = p.user_id
-          )
-    `, userID)
+          )`
+
+	args := []interface{}{userID}
+
+	if minLat != nil && maxLat != nil && minLon != nil && maxLon != nil {
+		q += `
+          AND p.location_lat BETWEEN $2 AND $3
+          AND p.location_lon BETWEEN $4 AND $5`
+		args = append(args, *minLat, *maxLat, *minLon, *maxLon)
+	}
+
+	return r.db.QueryContext(ctx, q, args...)
 }
 
 func (r *sqlRecommendationRepo) InsertDismissal(ctx context.Context, userID, dismissedUserID int) error {
